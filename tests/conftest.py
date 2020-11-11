@@ -21,7 +21,7 @@ def whale(accounts, history, web3):
 @pytest.fixture()
 def strategist(accounts, whale, currency):
     decimals = currency.decimals()
-    currency.transfer(accounts[1], 1000 * (10 ** decimals), {'from': whale})
+    currency.transfer(accounts[1], 100_000 * (10 ** decimals), {'from': whale})
     yield accounts[1]
 
 @pytest.fixture
@@ -29,7 +29,7 @@ def samdev(accounts):
     yield accounts.at('0xC3D6880fD95E06C816cB030fAc45b3ffe3651Cb0', force=True)
 @pytest.fixture
 def gov(accounts):
-    yield accounts[1]
+    yield accounts[3]
 
 
 

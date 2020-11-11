@@ -122,7 +122,7 @@ def test_normal_activity(usdc,Strategy, crUsdc,cUsdc, chain, whale,gov,strategis
 
 
 def test_debt_increase(usdc,Strategy, chain, whale,gov,strategist,rando,vault, strategy):
-
+    
     currency = usdc
     usdc.approve(vault, 2 ** 256 - 1, {"from": whale} )
 
@@ -162,3 +162,115 @@ def test_debt_increase(usdc,Strategy, chain, whale,gov,strategist,rando,vault, s
     for j in status:
         print(f"Lender: {j[0]}, Deposits: {formS.format(j[1]/1e6)}, APR: {form.format(j[2]/1e18)}")
     assert realApr > predictedApr*.999 and realApr <  predictedApr*1.001
+
+def test_vault_shares(strategy, chain, vault,cUsdc,  crUsdc, rewards,currency,gov, interface, whale, strategist):
+    deposit_limit = 100_000_000 *1e6
+    vault.addStrategy(strategy, deposit_limit, deposit_limit, 500, {"from": gov})
+    decimals = currency.decimals()
+    amount1 = 100000 *(10 ** decimals)
+
+    currency.approve(vault, 2 ** 256 - 1, {"from": whale})
+    currency.approve(vault, 2 ** 256 - 1, {"from": strategist})
+
+    vault.deposit(amount1, {"from": whale})
+    vault.deposit(amount1, {"from": strategist})
+
+    whale_share = vault.balanceOf(whale)
+
+    gov_share = vault.balanceOf(strategist)
+
+    assert gov_share == whale_share
+    assert vault.pricePerShare() == (10**decimals)
+    assert vault.pricePerShare() * whale_share / (10**decimals) == amount1
+
+    assert vault.pricePerShare() * whale_share / (10**decimals) == vault.totalAssets() / 2
+    assert gov_share == whale_share
+
+    strategy.harvest({"from": strategist})
+    # no profit yet
+    whale_share = vault.balanceOf(whale)
+    gov_share = vault.balanceOf(strategist)
+    rew_share = vault.balanceOf(rewards)
+    assert gov_share == whale_share and rew_share > 0
+    assert vault.pricePerShare() * (whale_share+rew_share+ gov_share) / (10**decimals) >  vault.totalAssets() *0.999 and vault.pricePerShare() * (whale_share+rew_share+ gov_share) / (10**decimals) <  vault.totalAssets() *1.001
+
+    chain.sleep(13 * 1000)
+    chain.mine(1000)
+
+    whale_share = vault.balanceOf(whale)
+    gov_share = vault.balanceOf(strategist)
+    rew_share = vault.balanceOf(rewards)
+    # no profit just aum fee. meaning total balance should be the same
+    assert (gov_share + whale_share + rew_share) * vault.pricePerShare() / (10**decimals) > amount1*2*0.999 and (gov_share + whale_share + rew_share) * vault.pricePerShare() / (10**decimals) < amount1*2*1.001
+    cUsdc.mint(0, {"from": whale})
+    crUsdc.mint(0, {"from": whale})
+    strategy.harvest({"from": strategist})
+    whale_share = vault.balanceOf(whale)
+    gov_share = vault.balanceOf(strategist)
+    rew_share = vault.balanceOf(rewards)
+    # add strategy return
+    assert vault.totalSupply() == whale_share + gov_share+rew_share
+    value = vault.totalSupply() * vault.pricePerShare() / (10**decimals)
+    assert value *0.99999 < vault.totalAssets() and value *1.00001 > vault.totalAssets()
+    
+    assert value*0.9999 < (amount1*2) + vault.strategies(strategy)[6] and value*1.0001 > (amount1*2) + vault.strategies(strategy)[6]
+    # check we are within 0.1% of expected returns
+    assert (
+        value < strategy.estimatedTotalAssets() * 1.001
+        and value > strategy.estimatedTotalAssets() * 0.999
+    )
+
+    assert gov_share > whale_share
+
+def test_apr(strategy, chain, vault,cUsdc,  crUsdc, rewards,currency,gov, interface, whale, strategist):
+    decimals = currency.decimals()
+    deposit_limit = 100_000_000 *1e6
+    vault.addStrategy(strategy, deposit_limit, deposit_limit, 500, {"from": gov})
+    andre = whale
+    gov = strategist
+    amount1 = 50  *(10 ** decimals)
+    currency.approve(vault, 2 ** 256 - 1, {"from": andre})
+    currency.approve(vault, 2 ** 256 - 1, {"from": gov})
+
+    amount2 = 50_000  *(10 ** decimals)
+
+    vault.deposit(amount1, {"from": gov})
+    vault.deposit(amount2, {"from": andre})
+
+    strategy.harvest({"from": gov})
+
+    startingBalance = vault.totalAssets()
+
+    for i in range(10):
+        cUsdc.mint(0, {"from": whale})
+        crUsdc.mint(0, {"from": whale})
+        waitBlock = 25
+        #print(f'\n----wait {waitBlock} blocks----')
+        chain.mine(waitBlock)
+        chain.sleep(25*13)
+        #print(f'\n----harvest----')
+        strategy.harvest({'from': strategist})
+
+        #genericStateOfStrat(strategy, currency, vault)
+        #genericStateOfVault(vault, currency)
+
+
+        profit = (vault.totalAssets() - startingBalance) /1e6
+        strState = vault.strategies(strategy)
+        totalReturns = strState[6]
+        totaleth = totalReturns /1e6
+        #print(f'Real Profit: {profit:.5f}')
+        difff= profit-totaleth
+        #print(f'Diff: {difff}')
+
+        blocks_per_year = 2_252_857
+        assert startingBalance != 0
+        time =(i+1)*waitBlock
+        assert time != 0
+        apr = (totalReturns/startingBalance) * (blocks_per_year / time)
+        assert apr > 0 and apr < 1
+        #print(apr)
+        print(f'implied apr: {apr:.8%}')
+
+    vault.withdraw(vault.balanceOf(gov), {"from": gov})
+    vault.withdraw(vault.balanceOf(andre), {"from": andre})
