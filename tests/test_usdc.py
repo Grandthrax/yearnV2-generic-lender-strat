@@ -12,20 +12,20 @@ def test_good_migration(usdc,Strategy, chain, whale,gov,strategist,rando,vault, 
 
     
     deposit_limit = 1_000_000_000 *1e6
-    vault.addStrategy(strategy, deposit_limit, deposit_limit, 500, {"from": strategist})
+    vault.addStrategy(strategy, deposit_limit, deposit_limit, 500, {"from": gov})
     
     amount1 = 500 *1e6
     vault.deposit(amount1, {"from": whale})
 
     amount1 = 50 *1e6
     vault.deposit(amount1, {"from": strategist})
-    gov= strategist
 
-    strategy.harvest({'from': gov})
+
+    strategy.harvest({'from': strategist})
     chain.sleep(30*13)
     chain.mine(30)
 
-    strategy.harvest({'from': gov})
+    strategy.harvest({'from': strategist})
 
     strategy_debt = vault.strategies(strategy)[4]  # totalDebt
     prior_position = strategy.estimatedTotalAssets()
@@ -53,7 +53,7 @@ def test_normal_activity(usdc,Strategy, crUsdc,cUsdc, chain, whale,gov,strategis
     usdc.approve(vault, 2 ** 256 - 1, {"from": strategist} )
     
     deposit_limit = 1_000_000_000 *1e6
-    vault.addStrategy(strategy, deposit_limit, deposit_limit, 500, {"from": strategist})
+    vault.addStrategy(strategy, deposit_limit, deposit_limit, 500, {"from": gov})
 
     
     #our humble strategist deposits some test funds
@@ -274,3 +274,53 @@ def test_apr(strategy, chain, vault,cUsdc,  crUsdc, rewards,currency,gov, interf
 
     vault.withdraw(vault.balanceOf(gov), {"from": gov})
     vault.withdraw(vault.balanceOf(andre), {"from": andre})
+
+
+def test_manual_override(Strategy, chain, vault,cUsdc,  crUsdc, rewards,currency,gov, GenericCompound, GenericCream, GenericDyDx, interface, whale, strategist):
+    strategy = strategist.deploy(Strategy, vault)
+    decimals = currency.decimals()
+    compoundPlugin = strategist.deploy(GenericCompound, strategy, "Compound", cUsdc)
+    creamPlugin = strategist.deploy(GenericCream, strategy, "Cream", crUsdc)
+    dydxPlugin = strategist.deploy(GenericDyDx, strategy, "DyDx")
+    strategy.addLender(compoundPlugin, {"from": strategist})
+    assert strategy.numLenders() == 1
+    strategy.addLender(creamPlugin, {"from": strategist})
+    assert strategy.numLenders() == 2
+    strategy.addLender(dydxPlugin, {"from": strategist})
+    assert strategy.numLenders() == 3
+
+    ecimals = currency.decimals()
+    deposit_limit = 100_000_000 *(10 ** decimals)
+    vault.addStrategy(strategy, deposit_limit, deposit_limit, 500, {"from": gov})
+    andre = whale
+    gov = strategist
+    amount1 = 50  *(10 ** decimals)
+    currency.approve(vault, 2 ** 256 - 1, {"from": andre})
+    currency.approve(vault, 2 ** 256 - 1, {"from": gov})
+
+    amount2 = 50_000  *(10 ** decimals)
+
+    vault.deposit(amount1, {"from": gov})
+    vault.deposit(amount2, {"from": andre})
+
+    strategy.harvest({"from": gov})
+
+    #at this stage only one strat has balance in it
+    assert (
+        (compoundPlugin.hasAssets() == False and  dydxPlugin.hasAssets() and creamPlugin.hasAssets() == False) or
+        (compoundPlugin.hasAssets() and dydxPlugin.hasAssets() == False and creamPlugin.hasAssets()== False) or
+        (compoundPlugin.hasAssets() == False and  dydxPlugin.hasAssets() == False and creamPlugin.hasAssets()) 
+    )
+
+    manualAll = [[compoundPlugin, 500],[dydxPlugin, 250],[creamPlugin, 250]]
+    strategy.manualAllocation(manualAll, {"from": gov})
+    status = strategy.lendStatuses()
+    assert (
+        (compoundPlugin.hasAssets()  and  dydxPlugin.hasAssets() and creamPlugin.hasAssets())
+    )
+
+    form = "{:.2%}"
+    formS = "{:,.0f}"
+    for j in status:
+        print(f"Lender: {j[0]}, Deposits: {formS.format(j[1]/1e6)}, APR: {form.format(j[2]/1e18)}")
+
