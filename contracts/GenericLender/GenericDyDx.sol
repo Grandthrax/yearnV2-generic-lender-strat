@@ -89,8 +89,7 @@ contract GenericDyDx is IGenericLender{
 
     //emergency withdraw. sends balance plus amount to governance
     function emergencyWithdraw(uint256 amount) external override management{
-       
-        //todo withdraw as much as possible
+        _withdraw(amount);
         want.safeTransfer(vault.governance(),want.balanceOf(address(this)));
 
     }
