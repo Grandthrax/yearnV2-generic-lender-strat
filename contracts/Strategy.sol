@@ -7,6 +7,7 @@ import "@yearnvaults/contracts/BaseStrategy.sol";
 
 import "@openzeppelinV3/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelinV3/contracts/math/SafeMath.sol";
+import "@openzeppelinV3/contracts/math/Math.sol";
 import "@openzeppelinV3/contracts/utils/Address.sol";
 import "@openzeppelinV3/contracts/token/ERC20/SafeERC20.sol";
 
@@ -14,7 +15,7 @@ import "@openzeppelinV3/contracts/token/ERC20/SafeERC20.sol";
  *   A lender optimisation strategy for any erc20 asset
  *   Made by SamPriestley.com
  *   https://github.com/Grandthrax/yearnV2-generic-lender-strat
- *   v0.1.3
+ *   v0.2.0
  *
  ********************* */
 
@@ -228,7 +229,12 @@ contract Strategy is BaseStrategy{
 
     //we need to free up profit plus _debtOutstanding. 
     //If _debtOutstanding is more than we can free we get as much as possible
-    function prepareReturn(uint256 _debtOutstanding) internal override returns (uint256 _profit) {
+    // should be no way for there to be a loss. we hope..
+    function prepareReturn(uint256 _debtOutstanding) internal override returns (uint256 _profit, uint256 _loss, uint256 _debtPayment) {
+        _profit = 0;
+        _loss = 0; //for clarity
+        _debtPayment = _debtOutstanding;
+        
         uint256 lentAssets = lentTotalAssets();
 
         uint256 looseAssets = want.balanceOf(address(this));
@@ -238,52 +244,59 @@ contract Strategy is BaseStrategy{
 
         if (lentAssets == 0) {
             //no position to harvest or profit to report
-            if(_debtOutstanding > looseAssets){
-                setReserve(0);
-            }else{
-                setReserve(looseAssets.sub(_debtOutstanding));
+            if(_debtPayment > looseAssets){
+                //we can only return looseAssets
+                _debtPayment = looseAssets;
             }
             
-            return 0;
-        }
-        if (getReserve() != 0) {
-            //reset reserve so it doesnt interfere anywhere else
-            setReserve(0);
+            return (_profit, _loss, _debtPayment);
         }
 
+       
         uint256 debt = vault.strategies(address(this)).totalDebt;
 
         if(total > debt){
-            uint profit = total-debt;
-            uint amountToFree = profit.add(_debtOutstanding);
+            _profit = total-debt;
+            uint amountToFree = _profit.add(_debtPayment);
 
             //we need to add outstanding to our profit
-            if(looseAssets >= amountToFree){
-                setReserve(looseAssets - amountToFree);
-            }else{
-                //change profit to what we can withdraw
+            //dont need to do logic if there is nothiing to free
+            if(amountToFree > 0 && looseAssets < amountToFree){
+                //withdraw what we can withdraw
                 _withdrawSome(amountToFree.sub(looseAssets));
                 uint256 newLoose = want.balanceOf(address(this));
 
-                if(newLoose > amountToFree){
-                    setReserve(newLoose - amountToFree);
-                }else{
-                    setReserve(0);
+                //if we dont have enough money adjust _debtOutstanding and only change profit if needed
+                if(newLoose < amountToFree){
+                    if(_profit > newLoose){
+                        _profit = newLoose;
+                        _debtPayment = 0;
+                    }else{
+                        _debtPayment = Math.min(newLoose - _loss, _profit);
+                    }
                 }
 
             }
-
-            return profit;
-
         } else {
-        
-            if(looseAssets <= _debtOutstanding){
-                     setReserve(0);
-            }else{
-                setReserve(looseAssets - _debtOutstanding);
-            }
+            _loss = debt - total;
+            uint amountToFree = _loss.add(_debtPayment);
 
-            return 0;
+            if(amountToFree > 0 && looseAssets < amountToFree){
+                //withdraw what we can withdraw
+                _withdrawSome(amountToFree.sub(looseAssets));
+                uint256 newLoose = want.balanceOf(address(this));
+
+                //if we dont have enough money adjust _debtOutstanding and only change profit if needed
+                if(newLoose < amountToFree){
+                    if(_loss > newLoose){
+                        _loss = newLoose;
+                        _debtPayment = 0;
+                    }else{
+                        _debtPayment = Math.min(newLoose - _loss, _debtPayment);
+                    }
+                }
+
+            }
         }
     }
 
@@ -296,13 +309,11 @@ contract Strategy is BaseStrategy{
     */
     function adjustPosition(uint256 _debtOutstanding) internal override {
 
-        _debtOutstanding; //ignored
+        _debtOutstanding; //ignored. we handle it in prepare return
         //emergency exit is dealt with at beginning of harvest
         if (emergencyExit) {
             return;
         }
-        //reset reserve and refund some gas
-        setReserve(0);
 
         //all loose assets are to be invested
         uint256 looseAssets = want.balanceOf(address(this));
@@ -417,12 +428,12 @@ contract Strategy is BaseStrategy{
     }
 
 
-    function exitPosition() internal override {
+    function exitPosition() internal override returns (uint256 _loss, uint256 _debtPayment){
         uint balance = lentTotalAssets();
         if(balance > 0){
             _withdrawSome(balance);
         }
-        setReserve(0);
+        _debtPayment = want.balanceOf(address(this));
     }
 
     /*
@@ -434,7 +445,6 @@ contract Strategy is BaseStrategy{
 
         if(_balance >= _amountNeeded){
             //if we don't set reserve here withdrawer will be sent our full balance
-            setReserve(_balance.sub(_amountNeeded));
             return _amountNeeded;
         }else{
             uint received = _withdrawSome(_amountNeeded - _balance).add(_balance);
