@@ -2,6 +2,28 @@ import pytest
 from brownie import Wei, config
 
 
+@pytest.fixture
+def live_strat_usdc_1(Strategy):
+    yield Strategy.at('0xB7e9Bf9De45E1df822E97cA7E0C3D1B62798a4e0')
+
+@pytest.fixture
+def live_vault_usdc(pm):
+    Vault = pm(config["dependencies"][0]).Vault
+    yield Vault.at('0xD6b53d0f3d4e55fbAaADc140C0B0488293a433f8')
+
+
+@pytest.fixture
+def live_GenericCompound_usdc_1(GenericCompound):
+    yield GenericCompound.at('0x33D4c129586562adfd993ebb54E830481F31ef37')
+
+@pytest.fixture
+def live_GenericCream_usdc_1(GenericCream):
+    yield GenericCream.at('0x1bAaCef951d24c5d70a8cA88D89cE16B37472fB3')
+
+@pytest.fixture
+def live_GenericDyDx_usdc_1(GenericDyDx):
+    yield GenericDyDx.at('0x6C842746F21Ca34542EDC6895dFfc8D4e7D2bC1c')
+
 #change these fixtures for generic tests
 @pytest.fixture
 def currency(dai, usdc, weth):
