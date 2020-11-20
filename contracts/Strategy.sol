@@ -13,7 +13,8 @@ import "@openzeppelinV3/contracts/token/ERC20/SafeERC20.sol";
 /********************
  *   A lender optimisation strategy for any erc20 asset
  *   Made by SamPriestley.com
- *   https://github.com/Grandthrax/yearnv2/blob/master/contracts/LenderYieldOptimiser.sol
+ *   https://github.com/Grandthrax/yearnV2-generic-lender-strat
+ *   v0.1.3
  *
  ********************* */
 
