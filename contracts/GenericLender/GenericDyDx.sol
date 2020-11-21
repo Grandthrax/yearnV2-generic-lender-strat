@@ -11,7 +11,6 @@ import "@openzeppelinV3/contracts/token/ERC20/SafeERC20.sol";
 
 import "../Interfaces/UniswapInterfaces/IUniswapV2Router02.sol";
 
-
 import "./IGenericLender.sol";
 
 /********************
@@ -21,22 +20,18 @@ import "./IGenericLender.sol";
  *
  ********************* */
 
-contract GenericDyDx is IGenericLender{
-
+contract GenericDyDx is IGenericLender {
     using SafeERC20 for IERC20;
     using Address for address;
     using SafeMath for uint256;
 
-    uint256 private constant secondPerYear = 31_153_900;//todo
+    uint256 private constant secondPerYear = 31_153_900; //todo
     address private constant SOLO = 0x1E0447b19BB6EcFdAe1e4AE1694b0C3659614e4e;
     uint256 public dydxMarketId;
 
-    constructor(address _strategy,string memory name) public IGenericLender(_strategy, name) {
-
-
+    constructor(address _strategy, string memory name) public IGenericLender(_strategy, name) {
         want.approve(SOLO, uint256(-1));
-       
-       
+
         ISoloMargin solo = ISoloMargin(SOLO);
         uint256 numMarkets = solo.getNumMarkets();
         address curToken;
@@ -49,76 +44,68 @@ contract GenericDyDx is IGenericLender{
             }
         }
         revert("No marketId found for provided token");
-
     }
 
-    function nav() external override view returns (uint256){
+    function nav() external view override returns (uint256) {
         return _nav();
-
     }
 
-    function _nav() internal view returns (uint256){
-       uint256 underlying = underlyingBalanceStored();
+    function _nav() internal view returns (uint256) {
+        uint256 underlying = underlyingBalanceStored();
         return want.balanceOf(address(this)).add(underlying);
-
     }
 
-    function underlyingBalanceStored() public view returns (uint256){
-        (address[] memory cur,,
-            Types.Wei[] memory balance) = ISoloMargin(SOLO).getAccountBalances(_getAccountInfo());
+    function underlyingBalanceStored() public view returns (uint256) {
+        (address[] memory cur, , Types.Wei[] memory balance) = ISoloMargin(SOLO).getAccountBalances(_getAccountInfo());
 
-            for(uint i = 0; i < cur.length; i++){
-                if(cur[i] == address(want)){
-                    return balance[i].value;
-                }
+        for (uint256 i = 0; i < cur.length; i++) {
+            if (cur[i] == address(want)) {
+                return balance[i].value;
             }
+        }
     }
 
-    function apr() external override view  returns (uint256){
+    function apr() external view override returns (uint256) {
         return _apr(0);
     }
-  
-    function weightedApr() external override view  returns (uint256){
+
+    function weightedApr() external view override returns (uint256) {
         uint256 a = _apr(0);
         return a.mul(_nav());
     }
 
-    function withdraw(uint256 amount) external override management returns (uint256){
+    function withdraw(uint256 amount) external override management returns (uint256) {
         return _withdraw(amount);
     }
 
     //emergency withdraw. sends balance plus amount to governance
-    function emergencyWithdraw(uint256 amount) external override management{
+    function emergencyWithdraw(uint256 amount) external override management {
         _withdraw(amount);
-        want.safeTransfer(vault.governance(),want.balanceOf(address(this)));
-
+        want.safeTransfer(vault.governance(), want.balanceOf(address(this)));
     }
 
     //withdraw an amount including any want balance
-    function _withdraw(uint256 amount) internal  returns (uint256){
+    function _withdraw(uint256 amount) internal returns (uint256) {
+        uint256 balanceUnderlying = underlyingBalanceStored();
+        uint256 looseBalance = want.balanceOf(address(this));
+        uint256 total = balanceUnderlying.add(looseBalance);
 
-        
-        uint balanceUnderlying = underlyingBalanceStored();
-        uint looseBalance = want.balanceOf(address(this));
-        uint total = balanceUnderlying.add(looseBalance);
-
-        if(amount > total) {
+        if (amount > total) {
             //cant withdraw more than we own
             amount = total;
         }
-        if(looseBalance >= amount){
-            want.safeTransfer(address(strategy),amount);
+        if (looseBalance >= amount) {
+            want.safeTransfer(address(strategy), amount);
             return amount;
         }
 
         //not state changing but OK because of previous call
-        uint liquidity = want.balanceOf(SOLO);
+        uint256 liquidity = want.balanceOf(SOLO);
 
-        if(liquidity > 1) {
+        if (liquidity > 1) {
             uint256 toWithdraw = amount.sub(looseBalance);
 
-            if(toWithdraw <= liquidity) {
-
+            if (toWithdraw <= liquidity) {
                 //we can take all
                 dydxWithdraw(toWithdraw);
             } else {
@@ -127,15 +114,13 @@ contract GenericDyDx is IGenericLender{
             }
         }
         looseBalance = want.balanceOf(address(this));
-        want.safeTransfer(address(strategy),looseBalance);
+        want.safeTransfer(address(strategy), looseBalance);
         return looseBalance;
-
     }
 
-    function dydxDeposit(uint256 depositAmount) internal  {
-
+    function dydxDeposit(uint256 depositAmount) internal {
         ISoloMargin solo = ISoloMargin(SOLO);
-      
+
         Actions.ActionArgs[] memory operations = new Actions.ActionArgs[](1);
 
         operations[0] = _getDepositAction(dydxMarketId, depositAmount);
@@ -144,11 +129,10 @@ contract GenericDyDx is IGenericLender{
         accountInfos[0] = _getAccountInfo();
 
         solo.operate(accountInfos, operations);
-     }
+    }
 
-     function dydxWithdraw(uint256 amount) internal {
+    function dydxWithdraw(uint256 amount) internal {
         ISoloMargin solo = ISoloMargin(SOLO);
-        
 
         Actions.ActionArgs[] memory operations = new Actions.ActionArgs[](1);
 
@@ -158,53 +142,46 @@ contract GenericDyDx is IGenericLender{
         accountInfos[0] = _getAccountInfo();
 
         solo.operate(accountInfos, operations);
+    }
 
-
-     }
-
-    
-    function deposit() external override management{
+    function deposit() external override management {
         uint256 balance = want.balanceOf(address(this));
         dydxDeposit(balance);
-
     }
-    function withdrawAll() external override management returns (bool){
-        uint balance = _nav();
+
+    function withdrawAll() external override management returns (bool) {
+        uint256 balance = _nav();
         uint256 returned = _withdraw(balance);
         return returned >= balance;
-
     }
 
     //think about this
-    function enabled() external override view returns (bool){
+    function enabled() external view override returns (bool) {
         return true;
-
     }
-    function hasAssets() external override view returns (bool){
+
+    function hasAssets() external view override returns (bool) {
         return underlyingBalanceStored() > 0;
-
     }
 
-    function aprAfterDeposit(uint256 amount) external override view returns (uint256){
-       return _apr(amount);
-
+    function aprAfterDeposit(uint256 amount) external view override returns (uint256) {
+        return _apr(amount);
     }
 
-    function _apr(uint256 extraSupply) internal view returns (uint256){
-
-        ISoloMargin solo =ISoloMargin(SOLO);
+    function _apr(uint256 extraSupply) internal view returns (uint256) {
+        ISoloMargin solo = ISoloMargin(SOLO);
         Types.TotalPar memory par = solo.getMarketTotalPar(dydxMarketId);
         Interest.Index memory index = solo.getMarketCurrentIndex(dydxMarketId);
         address interestSetter = solo.getMarketInterestSetter(dydxMarketId);
         uint256 borrow = uint256(par.borrow).mul(index.borrow).div(1e18);
         uint256 supply = (uint256(par.supply).mul(index.supply).div(1e18)).add(extraSupply);
 
-        uint256 borrowInterestRate = IInterestSetter(interestSetter).getInterestRate(address(want),borrow, supply).value;
+        uint256 borrowInterestRate = IInterestSetter(interestSetter).getInterestRate(address(want), borrow, supply).value;
         uint256 lendInterestRate = borrowInterestRate.mul(borrow).div(supply);
         return lendInterestRate.mul(secondPerYear);
     }
 
-    function protectedTokens() internal override view returns (address[] memory) {
+    function protectedTokens() internal view override returns (address[] memory) {
         address[] memory protected = new address[](1);
         protected[0] = address(want);
         return protected;
@@ -248,9 +225,7 @@ contract GenericDyDx is IGenericLender{
             });
     }
 
-
     function _getAccountInfo() internal view returns (Account.Info memory) {
         return Account.Info({owner: address(this), number: 0});
     }
-
 }

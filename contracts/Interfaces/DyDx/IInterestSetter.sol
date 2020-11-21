@@ -1,4 +1,3 @@
-  
 /*
     Copyright 2019 dYdX Trading Inc.
     Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,8 +14,7 @@
 pragma solidity >=0.5.7;
 pragma experimental ABIEncoderV2;
 
-import { Interest } from "./ISoloMargin.sol";
-
+import {Interest} from "./ISoloMargin.sol";
 
 /**
  * @title IInterestSetter
@@ -25,7 +23,6 @@ import { Interest } from "./ISoloMargin.sol";
  * Interface that Interest Setters for Solo must implement in order to report interest rates.
  */
 interface IInterestSetter {
-
     // ============ Public Functions ============
 
     /**
@@ -40,8 +37,5 @@ interface IInterestSetter {
         address token,
         uint256 borrowWei,
         uint256 supplyWei
-    )
-        external
-        view
-        returns (Interest.Rate memory);
+    ) external view returns (Interest.Rate memory);
 }

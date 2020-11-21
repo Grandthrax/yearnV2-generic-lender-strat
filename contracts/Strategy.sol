@@ -19,18 +19,14 @@ import "@openzeppelinV3/contracts/token/ERC20/SafeERC20.sol";
  *
  ********************* */
 
-
-contract Strategy is BaseStrategy{
-
+contract Strategy is BaseStrategy {
     using SafeERC20 for IERC20;
     using Address for address;
     using SafeMath for uint256;
 
     IGenericLender[] public lenders;
 
-
     constructor(address _vault) public BaseStrategy(_vault) {
- 
         // You can set these parameters on deployment to whatever you want
         minReportDelay = 6300;
         profitFactor = 100;
@@ -40,71 +36,66 @@ contract Strategy is BaseStrategy{
         require(keccak256(bytes(apiVersion())) == keccak256(bytes(VaultAPI(_vault).apiVersion())), "WRONG VERSION");
     }
 
-
     // ******** OVERRIDE THESE METHODS FROM BASE CONTRACT ************
 
-    function name() external override pure returns (string memory) {
+    function name() external pure override returns (string memory) {
         // Add your own name here, suggestion e.g. "StrategyCreamYFI"
         return "StrategyLenderYieldOptimiser";
     }
 
     //management functions
-    function addLender(address a) public management{
-       IGenericLender n = IGenericLender(a);
+    function addLender(address a) public management {
+        IGenericLender n = IGenericLender(a);
 
-        for(uint i = 0; i < lenders.length; i++){
+        for (uint256 i = 0; i < lenders.length; i++) {
             require(a != address(lenders[i]), "Already Added");
         }
         lenders.push(n);
     }
-    function safeRemoveLender(address a) public management{
+
+    function safeRemoveLender(address a) public management {
         _removeLender(a, false);
     }
 
-    function forceRemoveLender(address a) public management{
+    function forceRemoveLender(address a) public management {
         _removeLender(a, true);
-       
     }
-    function _removeLender(address a, bool force) internal {
-        for(uint i = 0; i < lenders.length; i++){
-            
-            if(a == address(lenders[i])){
 
+    function _removeLender(address a, bool force) internal {
+        for (uint256 i = 0; i < lenders.length; i++) {
+            if (a == address(lenders[i])) {
                 bool allWithdrawn = lenders[i].withdrawAll();
 
-                if(!force){
+                if (!force) {
                     require(allWithdrawn, "WITHDRAW FAILED");
                 }
-                
 
                 //put the last index here
                 //remove last index
-                if(i != lenders.length){
-                    lenders[i] = lenders[lenders.length-1];
+                if (i != lenders.length) {
+                    lenders[i] = lenders[lenders.length - 1];
                 }
-                delete lenders[lenders.length-1];
+                delete lenders[lenders.length - 1];
 
                 //if balance to spend
-                if(want.balanceOf(address(this)) > 0){
+                if (want.balanceOf(address(this)) > 0) {
                     adjustPosition(0);
                 }
                 return;
             }
         }
         require(false, "NOT LENDER");
-        
-
     }
 
-    struct lendStatus{
+    struct lendStatus {
         string name;
         uint256 assets;
         uint256 rate;
     }
-    
-    function lendStatuses() public view returns(lendStatus[] memory){
+
+    function lendStatuses() public view returns (lendStatus[] memory) {
         lendStatus[] memory statuses = new lendStatus[](lenders.length);
-         for(uint i = 0; i < lenders.length; i++){
+        for (uint256 i = 0; i < lenders.length; i++) {
             lendStatus memory s;
             s.name = lenders[i].lenderName();
             s.assets = lenders[i].nav();
@@ -115,10 +106,8 @@ contract Strategy is BaseStrategy{
         return statuses;
     }
 
-
     // lent assets plus loose assets
-    function estimatedTotalAssets() public override view returns (uint256) {
-        
+    function estimatedTotalAssets() public view override returns (uint256) {
         uint256 nav = lentTotalAssets();
         nav += want.balanceOf(address(this));
 
@@ -127,45 +116,42 @@ contract Strategy is BaseStrategy{
 
     function numLenders() public view returns (uint256) {
         return lenders.length;
-
     }
 
     function estimatedAPR() public view returns (uint256) {
         uint256 bal = estimatedTotalAssets();
-        if(bal == 0){
+        if (bal == 0) {
             return 0;
         }
 
         uint256 weightedAPR = 0;
-        
-        for(uint i = 0; i < lenders.length; i++){
+
+        for (uint256 i = 0; i < lenders.length; i++) {
             weightedAPR += lenders[i].weightedApr();
         }
 
-        
-
         return weightedAPR.div(bal);
     }
-    function _estimateDebtLimitIncrease(uint256 change) internal view returns (uint256){
+
+    function _estimateDebtLimitIncrease(uint256 change) internal view returns (uint256) {
         uint256 highestAPR = 0;
         uint256 aprChoice = 0;
         uint256 assets = 0;
 
-        for(uint i = 0; i < lenders.length; i++){
+        for (uint256 i = 0; i < lenders.length; i++) {
             uint256 apr = lenders[i].aprAfterDeposit(change);
-            if(apr > highestAPR){
+            if (apr > highestAPR) {
                 aprChoice = i;
                 highestAPR = apr;
                 assets = lenders[i].nav();
             }
         }
 
+        uint256 weightedAPR = highestAPR.mul(assets.add(change));
 
-        uint256 weightedAPR =highestAPR.mul(assets.add(change));
-
-        for(uint i = 0; i < lenders.length; i++){
-            if(i != aprChoice){
-                weightedAPR += lenders[i].weightedApr();                   
+        for (uint256 i = 0; i < lenders.length; i++) {
+            if (i != aprChoice) {
+                weightedAPR += lenders[i].weightedApr();
             }
         }
 
@@ -174,8 +160,16 @@ contract Strategy is BaseStrategy{
         return weightedAPR.div(bal);
     }
 
-    function estimateAdjustPosition() public view returns (uint256 _lowest,uint256 _lowestApr, uint256 _highest,uint256 _potential){
-    
+    function estimateAdjustPosition()
+        public
+        view
+        returns (
+            uint256 _lowest,
+            uint256 _lowestApr,
+            uint256 _highest,
+            uint256 _potential
+        )
+    {
         //all loose assets are to be invested
         uint256 looseAssets = want.balanceOf(address(this));
 
@@ -185,15 +179,15 @@ contract Strategy is BaseStrategy{
         _lowestApr = uint256(-1);
         _lowest = 0;
         uint256 lowestNav = 0;
-        for(uint i = 0; i < lenders.length; i++){
-            if(lenders[i].hasAssets()){
+        for (uint256 i = 0; i < lenders.length; i++) {
+            if (lenders[i].hasAssets()) {
                 uint256 apr = lenders[i].apr();
-                if(apr < _lowestApr){
+                if (apr < _lowestApr) {
                     _lowestApr = apr;
                     _lowest = i;
                     lowestNav = lenders[i].nav();
                 }
-             }
+            }
         }
 
         uint256 toAdd = lowestNav.add(looseAssets);
@@ -201,47 +195,41 @@ contract Strategy is BaseStrategy{
         uint256 highestApr = 0;
         _highest = 0;
 
-        for(uint i = 0; i < lenders.length; i++){
-
-           
+        for (uint256 i = 0; i < lenders.length; i++) {
             uint256 apr;
             apr = lenders[i].aprAfterDeposit(looseAssets);
-           
-            if(apr > highestApr){
+
+            if (apr > highestApr) {
                 highestApr = apr;
                 _highest = i;
             }
-             
         }
 
         //if we can improve apr by withdrawing we do so
         _potential = lenders[_highest].aprAfterDeposit(toAdd);
-        
     }
 
-
     //TODO: needs improvement. more complicated than limit increase
-    function _estimateDebtLimitDecrease(uint256 change) internal view returns (uint256){
-         uint256 lowestApr = uint256(-1);
+    function _estimateDebtLimitDecrease(uint256 change) internal view returns (uint256) {
+        uint256 lowestApr = uint256(-1);
         uint256 aprChoice = 0;
 
-        for(uint i = 0; i < lenders.length; i++){
+        for (uint256 i = 0; i < lenders.length; i++) {
             uint256 apr = lenders[i].aprAfterDeposit(change);
-            if(apr < lowestApr){
+            if (apr < lowestApr) {
                 aprChoice = i;
                 lowestApr = apr;
             }
         }
 
+        uint256 weightedAPR = 0;
 
-        uint256 weightedAPR =0;
-
-        for(uint i = 0; i < lenders.length; i++){
-            if(i != aprChoice){
+        for (uint256 i = 0; i < lenders.length; i++) {
+            if (i != aprChoice) {
                 weightedAPR += lenders[i].weightedApr();
-            }else{
-                uint256 asset  = lenders[i].nav();
-                if(asset < change){
+            } else {
+                uint256 asset = lenders[i].nav();
+                if (asset < change) {
                     //simplistic. not accurate
                     change = asset;
                 }
@@ -253,139 +241,133 @@ contract Strategy is BaseStrategy{
     }
 
     function estimatedFutureAPR(uint256 newDebtLimit) public view returns (uint256) {
-
         uint256 oldDebtLimit = vault.strategies(address(this)).totalDebt;
         uint256 change;
-        if(oldDebtLimit < newDebtLimit){
+        if (oldDebtLimit < newDebtLimit) {
             change = newDebtLimit - oldDebtLimit;
             return _estimateDebtLimitIncrease(change);
-        }else{
+        } else {
             change = oldDebtLimit - newDebtLimit;
             return _estimateDebtLimitDecrease(change);
         }
-
-       
-       
     }
 
     //cycle all lenders and collect balances
     function lentTotalAssets() public view returns (uint256) {
-        uint nav = 0;
-        for(uint i = 0; i < lenders.length; i++){
+        uint256 nav = 0;
+        for (uint256 i = 0; i < lenders.length; i++) {
             nav += lenders[i].nav();
         }
         return nav;
-     }
+    }
 
-    //we need to free up profit plus _debtOutstanding. 
+    //we need to free up profit plus _debtOutstanding.
     //If _debtOutstanding is more than we can free we get as much as possible
     // should be no way for there to be a loss. we hope..
-    function prepareReturn(uint256 _debtOutstanding) internal override returns (uint256 _profit, uint256 _loss, uint256 _debtPayment) {
+    function prepareReturn(uint256 _debtOutstanding)
+        internal
+        override
+        returns (
+            uint256 _profit,
+            uint256 _loss,
+            uint256 _debtPayment
+        )
+    {
         _profit = 0;
         _loss = 0; //for clarity
         _debtPayment = _debtOutstanding;
-        
+
         uint256 lentAssets = lentTotalAssets();
 
         uint256 looseAssets = want.balanceOf(address(this));
 
         uint256 total = looseAssets.add(lentAssets);
 
-
         if (lentAssets == 0) {
             //no position to harvest or profit to report
-            if(_debtPayment > looseAssets){
+            if (_debtPayment > looseAssets) {
                 //we can only return looseAssets
                 _debtPayment = looseAssets;
             }
-            
+
             return (_profit, _loss, _debtPayment);
         }
 
-       
         uint256 debt = vault.strategies(address(this)).totalDebt;
 
-        if(total > debt){
-            _profit = total-debt;
-            uint amountToFree = _profit.add(_debtPayment);
+        if (total > debt) {
+            _profit = total - debt;
+            uint256 amountToFree = _profit.add(_debtPayment);
 
             //we need to add outstanding to our profit
             //dont need to do logic if there is nothiing to free
-            if(amountToFree > 0 && looseAssets < amountToFree){
+            if (amountToFree > 0 && looseAssets < amountToFree) {
                 //withdraw what we can withdraw
                 _withdrawSome(amountToFree.sub(looseAssets));
                 uint256 newLoose = want.balanceOf(address(this));
 
                 //if we dont have enough money adjust _debtOutstanding and only change profit if needed
-                if(newLoose < amountToFree){
-                    if(_profit > newLoose){
+                if (newLoose < amountToFree) {
+                    if (_profit > newLoose) {
                         _profit = newLoose;
                         _debtPayment = 0;
-                    }else{
+                    } else {
                         _debtPayment = Math.min(newLoose - _loss, _profit);
                     }
                 }
-
             }
         } else {
             _loss = debt - total;
-            uint amountToFree = _loss.add(_debtPayment);
+            uint256 amountToFree = _loss.add(_debtPayment);
 
-            if(amountToFree > 0 && looseAssets < amountToFree){
+            if (amountToFree > 0 && looseAssets < amountToFree) {
                 //withdraw what we can withdraw
 
                 _withdrawSome(amountToFree.sub(looseAssets));
                 uint256 newLoose = want.balanceOf(address(this));
 
                 //if we dont have enough money adjust _debtOutstanding and only change profit if needed
-                if(newLoose < amountToFree){
-                    if(_loss > newLoose){
+                if (newLoose < amountToFree) {
+                    if (_loss > newLoose) {
                         _loss = newLoose;
                         _debtPayment = 0;
-                    }else{
+                    } else {
                         _debtPayment = Math.min(newLoose - _loss, _debtPayment);
                     }
                 }
-
             }
         }
     }
 
     /*
-    * Key logic.
-    *   The algorithm moves assets from lowest return to highest
-    *   like a very slow idiots bubble sort
-    *   we ignore debt outstanding for an easy life
-    *
-    */
+     * Key logic.
+     *   The algorithm moves assets from lowest return to highest
+     *   like a very slow idiots bubble sort
+     *   we ignore debt outstanding for an easy life
+     *
+     */
     function adjustPosition(uint256 _debtOutstanding) internal override {
-
         _debtOutstanding; //ignored. we handle it in prepare return
         //emergency exit is dealt with at beginning of harvest
         if (emergencyExit) {
             return;
         }
 
-        
         (uint256 lowest, uint256 lowestApr, uint256 highest, uint256 potential) = estimateAdjustPosition();
 
-        if(potential > lowestApr){
+        if (potential > lowestApr) {
             //apr should go down after deposit so wont be withdrawing from self
             lenders[lowest].withdrawAll();
         }
 
         uint256 bal = want.balanceOf(address(this));
-        if(bal > 0)
-        {
-            want.safeTransfer(address(lenders[highest]),bal );
+        if (bal > 0) {
+            want.safeTransfer(address(lenders[highest]), bal);
             lenders[highest].deposit();
-
         }
-        
-
     }
 
-    struct lenderRatio{
+    struct lenderRatio {
         address lender;
         //share x 1000
         uint16 share;
@@ -395,67 +377,63 @@ contract Strategy is BaseStrategy{
     function manualAllocation(lenderRatio[] memory _newPositions) public management {
         uint256 share = 0;
 
-        for(uint i = 0; i < lenders.length; i++){
+        for (uint256 i = 0; i < lenders.length; i++) {
             lenders[i].withdrawAll();
         }
 
         uint256 assets = want.balanceOf(address(this));
 
-        for(uint i = 0; i < _newPositions.length; i++){
+        for (uint256 i = 0; i < _newPositions.length; i++) {
             bool found = false;
 
             //might be annoying and expensive to do this second loop but worth it for safety
-            for(uint j = 0; j < lenders.length; j++){
-                if(address(lenders[j]) ==_newPositions[j].lender ){
+            for (uint256 j = 0; j < lenders.length; j++) {
+                if (address(lenders[j]) == _newPositions[j].lender) {
                     found = true;
                 }
             }
             require(found, "NOT LENDER");
 
-            share+= _newPositions[i].share;
+            share += _newPositions[i].share;
             uint256 toSend = assets.mul(_newPositions[i].share).div(1000);
             want.safeTransfer(_newPositions[i].lender, toSend);
             IGenericLender(_newPositions[i].lender).deposit();
         }
 
         require(share == 1000, "SHARE!=1000");
-
     }
 
-
     //cycle through withdrawing from worst rate first
-    function _withdrawSome(uint256 _amount) internal returns(uint256 amountWithdrawn) {
+    function _withdrawSome(uint256 _amount) internal returns (uint256 amountWithdrawn) {
         //dont withdraw dust
-        if(_amount < debtThreshold){
+        if (_amount < debtThreshold) {
             return 0;
         }
 
         amountWithdrawn = 0;
         //most situations this will only run once. Only big withdrawals will be a gas guzzler
-        while(amountWithdrawn < _amount){
+        while (amountWithdrawn < _amount) {
             uint256 lowestApr = uint256(-1);
             uint256 lowest = 0;
-            for(uint i = 0; i < lenders.length; i++){
-                if(lenders[i].hasAssets()){
+            for (uint256 i = 0; i < lenders.length; i++) {
+                if (lenders[i].hasAssets()) {
                     uint256 apr = lenders[i].apr();
-                    if(apr < lowestApr){
+                    if (apr < lowestApr) {
                         lowestApr = apr;
                         lowest = i;
                     }
                 }
-                
             }
-            if(!lenders[lowest].hasAssets()){
+            if (!lenders[lowest].hasAssets()) {
                 return amountWithdrawn;
             }
             amountWithdrawn += lenders[lowest].withdraw(_amount);
         }
     }
 
-
-    function exitPosition() internal override returns (uint256 _loss, uint256 _debtPayment){
-        uint balance = lentTotalAssets();
-        if(balance > 0){
+    function exitPosition() internal override returns (uint256 _loss, uint256 _debtPayment) {
+        uint256 balance = lentTotalAssets();
+        if (balance > 0) {
             _withdrawSome(balance);
         }
         _debtPayment = want.balanceOf(address(this));
@@ -466,36 +444,34 @@ contract Strategy is BaseStrategy{
      * up to `_amountNeeded`. Any excess should be re-invested here as well.
      */
     function liquidatePosition(uint256 _amountNeeded) internal override returns (uint256 _amountFreed) {
-         uint256 _balance = want.balanceOf(address(this));
+        uint256 _balance = want.balanceOf(address(this));
 
-        if(_balance >= _amountNeeded){
+        if (_balance >= _amountNeeded) {
             //if we don't set reserve here withdrawer will be sent our full balance
             return _amountNeeded;
-        }else{
-            uint received = _withdrawSome(_amountNeeded - _balance).add(_balance);
-            if(received > _amountNeeded){
-                return  _amountNeeded;
-            }else{
+        } else {
+            uint256 received = _withdrawSome(_amountNeeded - _balance).add(_balance);
+            if (received > _amountNeeded) {
+                return _amountNeeded;
+            } else {
                 return received;
             }
-
         }
     }
 
-    function tendTrigger(uint256 callCost) public override view returns (bool) {
+    function tendTrigger(uint256 callCost) public view override returns (bool) {
         // We usually don't need tend, but if there are positions that need active maintainence,
         // overriding this function is how you would signal for that
-        if(harvestTrigger(callCost)){
+        if (harvestTrigger(callCost)) {
             return false;
         }
 
-        //now let's check if there is better apr somewhere else. 
+        //now let's check if there is better apr somewhere else.
         //If there is and profit potential is worth changing then lets do it
         (uint256 lowest, uint256 lowestApr, , uint256 potential) = estimateAdjustPosition();
 
         //if protential > lowestApr it means we are changing horses
-        if(potential > lowestApr){
-
+        if (potential > lowestApr) {
             uint256 nav = lenders[lowest].nav();
 
             //profit increase is 1 days profit with new apr
@@ -503,7 +479,6 @@ contract Strategy is BaseStrategy{
 
             return (profitFactor * callCost < profitIncrease);
         }
-
     }
 
     /*
@@ -528,15 +503,14 @@ contract Strategy is BaseStrategy{
     //      protected[2] = tokenC;
     //      return protected;
     //    }
-    function protectedTokens() internal override view returns (address[] memory) {
+    function protectedTokens() internal view override returns (address[] memory) {
         address[] memory protected = new address[](2);
         protected[0] = address(want);
         return protected;
     }
 
-    modifier management(){
+    modifier management() {
         require(msg.sender == governance() || msg.sender == strategist, "!management");
         _;
     }
-
 }
