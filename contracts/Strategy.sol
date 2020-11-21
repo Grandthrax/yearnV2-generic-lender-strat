@@ -131,13 +131,18 @@ contract Strategy is BaseStrategy{
     }
 
     function estimatedAPR() public view returns (uint256) {
+        uint256 bal = estimatedTotalAssets();
+        if(bal == 0){
+            return 0;
+        }
+
         uint256 weightedAPR = 0;
         
         for(uint i = 0; i < lenders.length; i++){
             weightedAPR += lenders[i].weightedApr();
         }
 
-        uint256 bal = estimatedTotalAssets();
+        
 
         return weightedAPR.div(bal);
     }

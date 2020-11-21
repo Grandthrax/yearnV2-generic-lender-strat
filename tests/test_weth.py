@@ -196,3 +196,58 @@ def test_debt_increase_weth(weth,Strategy, chain,rewards, whale,gov,strategist,r
     for j in status:
         print(f"Lender: {j[0]}, Deposits: {formS.format(j[1]/1e18)}, APR: {form.format(j[2]/1e18)}")
     assert realApr > predictedApr*.999 and realApr <  predictedApr*1.001
+
+def test_debt_increment_weth(weth,Strategy, chain,rewards, whale,gov,strategist,rando,Vault,GenericDyDx,AlphaHomo, interface, EthCream, EthCompound):
+    
+    currency = weth
+
+    crETH = interface.CEtherI('0xD06527D5e56A3495252A528C4987003b712860eE')
+    cETH = interface.CEtherI('0x4Ddc2D193948926D02f9B1fE9e1daa0718270ED5')
+    bank = interface.Bank('0x67B66C99D3Eb37Fa76Aa3Ed1ff33E8e39F0b9c7A')
+    balance = whale.balance()  - 1e18 # leave 1 eth for gas
+    
+
+    vault = gov.deploy(Vault, weth, gov, rewards, "", "")
+
+    weth.approve(vault, 2 ** 256 - 1, {"from": whale} )
+    weth.deposit({"from": whale, "value": balance})
+
+    strategy = strategist.deploy(Strategy, vault)
+
+    ethCreamPlugin = strategist.deploy(EthCream, strategy, "Cream")
+    strategy.addLender(ethCreamPlugin, {"from": strategist})
+
+    alphaHomoPlugin = strategist.deploy(AlphaHomo, strategy, "Alpha Homo")
+    strategy.addLender(alphaHomoPlugin, {"from": strategist})
+
+    compoundPlugin = strategist.deploy(EthCompound, strategy, "Compound")
+    strategy.addLender(compoundPlugin, {"from": strategist})
+
+    dydxPlugin = strategist.deploy(GenericDyDx, strategy, "DyDx")
+    strategy.addLender(dydxPlugin, {"from": strategist})
+
+    assert strategy.numLenders() == 4
+
+
+    deposit_limit = 1_000_000_000 *1e18
+    vault.addStrategy(strategy, deposit_limit, deposit_limit, 500, {"from": gov})
+
+
+
+    form = "{:.2%}"
+    formS = "{:,.0f}"
+    for i in range(10):
+        firstDeposit = 3000 *1e18
+    
+    
+        vault.deposit(firstDeposit, {"from": whale})
+        print("\nDeposit: ", formS.format(firstDeposit/1e18))
+        strategy.harvest({"from": strategist})
+        realApr = strategy.estimatedAPR()
+        print("Current APR: ", form.format(realApr/1e18))
+        status = strategy.lendStatuses()
+    
+        for j in status:
+            print(f"Lender: {j[0]}, Deposits: {formS.format(j[1]/1e18)}, APR: {form.format(j[2]/1e18)}")
+    
+    
