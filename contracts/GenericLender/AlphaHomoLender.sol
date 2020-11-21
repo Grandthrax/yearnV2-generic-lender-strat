@@ -1,47 +1,43 @@
 pragma solidity ^0.6.12;
 pragma experimental ABIEncoderV2;
 
-import "../Interfaces/Compound/CErc20I.sol";
-import "../Interfaces/Compound/InterestRateModel.sol";
 import "@openzeppelinV3/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelinV3/contracts/math/SafeMath.sol";
 import "@openzeppelinV3/contracts/utils/Address.sol";
 import "@openzeppelinV3/contracts/token/ERC20/SafeERC20.sol";
 
-import "../Interfaces/UniswapInterfaces/IUniswapV2Router02.sol";
+import "../Interfaces/alpha-homora/Bank.sol";
+import "../Interfaces/alpha-homora/BankConfig.sol";
+import "../Interfaces/UniswapInterfaces/IWETH.sol";
 
 
 import "./IGenericLender.sol";
 
 /********************
- *   A lender plugin for LenderYieldOptimiser for any erc20 asset on compound (not eth)
+ *   A lender plugin for LenderYieldOptimiser for any erc20 asset on Cream (not eth)
  *   Made by SamPriestley.com
- *   https://github.com/Grandthrax/yearnv2/blob/master/contracts/GenericDyDx/GenericCompound.sol
+ *   https://github.com/Grandthrax/yearnv2/blob/master/contracts/GenericLender/GenericCream.sol
  *
  ********************* */
 
-contract GenericCompound is IGenericLender{
+contract AlphaHomo is IGenericLender{
 
     using SafeERC20 for IERC20;
     using Address for address;
     using SafeMath for uint256;
 
-    uint256 private constant blocksPerYear = 2_300_000;
-    address public constant uniswapRouter = address(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
-    address public constant comp = address(0xc00e94Cb662C3520282E6f5717214004A7f26888);
+    uint256 private constant secondsPerYear = 31556952;
     address public constant weth = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+    address public constant bank = address(0x67B66C99D3Eb37Fa76Aa3Ed1ff33E8e39F0b9c7A);
 
-    uint256 public minCompToSell = 0.5 ether;
+    constructor(address _strategy,string memory name) public IGenericLender(_strategy, name) {
+       require(address(want) == weth, "NOT WETH");
 
-    CErc20I public cToken;
-    constructor(address _strategy,string memory name, address _cToken) public IGenericLender(_strategy, name) {
-        cToken = CErc20I(_cToken);
-
-        require(cToken.underlying() == address(want), "WRONG CTOKEN");
-
-        want.approve(_cToken, uint256(-1));
+       //want.approve(_cToken, uint256(-1));
 
     }
+
+    receive() external payable {}
 
     function nav() external override view returns (uint256){
         return _nav();
@@ -53,24 +49,56 @@ contract GenericCompound is IGenericLender{
 
     }
 
+    function bankBalance() internal view returns (uint256 _profit) {
+        Bank b = Bank(bank);
+        return b.balanceOf(address(this)).mul(b.totalETH().add(b.pendingInterest(0))).div(b.totalSupply());
+        //return b.debtShareToVal( b.balanceOf(address(this)));
+     }
+
+     function withdrawUnderlying(uint256 amount) internal  returns (uint256){
+       
+        Bank b = Bank(bank);
+
+        uint256 shares = amount.mul(b.totalSupply()).div(b.totalETH());
+        // uint256 shares = b.debtValToShare(amount);
+        uint balance = b.balanceOf(address(this));
+       if(shares > balance) {
+            b.withdraw(balance);
+       } else {
+           b.withdraw(shares);
+       }
+
+        uint256 withdrawn = address(this).balance;
+        IWETH(weth).deposit{value: withdrawn}();
+
+        return withdrawn;
+     }
+
     function underlyingBalanceStored() public view returns (uint256 balance){
-        uint256 currentCr = cToken.balanceOf(address(this));
-        if(currentCr == 0){
-            balance = 0;
-        }else{
-            balance = currentCr.mul(cToken.exchangeRateStored()).div(1e18);
-        }
+        Bank b = Bank(bank);
+        return b.balanceOf(address(this)).mul(b.totalETH().add(b.pendingInterest(0))).div(b.totalSupply());
     }
 
     function apr() external override view  returns (uint256){
-        return _apr();
+        return _apr(0);
     }
-    function _apr() internal view returns (uint256){
-        return cToken.supplyRatePerBlock().mul(blocksPerYear);
+    
+
+    function aprAfterDeposit(uint256 amount) external override view returns (uint256){
+       return _apr(amount);
+
+    }
+    function _apr(uint256 amount) internal view returns (uint256){
+        Bank b = Bank(bank);
+        BankConfig config = BankConfig(b.config());
+        uint256 balance = bank.balance.add(amount);
+        uint256 ratePerSec = config.getInterestRate(b.glbDebtVal(), balance);
+        
+        return ratePerSec.mul(secondsPerYear);
     }
   
     function weightedApr() external override view  returns (uint256){
-        uint256 a = _apr();
+        uint256 a = _apr(0);
         return a.mul(_nav());
     }
 
@@ -80,7 +108,7 @@ contract GenericCompound is IGenericLender{
 
     //emergency withdraw. sends balance plus amount to governance
     function emergencyWithdraw(uint256 amount) external override management{
-        cToken.redeemUnderlying(amount);
+        withdrawUnderlying(amount);
         
         want.safeTransfer(vault.governance(),want.balanceOf(address(this)));
 
@@ -89,7 +117,7 @@ contract GenericCompound is IGenericLender{
     //withdraw an amount including any want balance
     function _withdraw(uint256 amount) internal  returns (uint256){
 
-        uint balanceUnderlying = cToken.balanceOfUnderlying(address(this));
+        uint balanceUnderlying = underlyingBalanceStored();
         uint looseBalance = want.balanceOf(address(this));
         uint total = balanceUnderlying.add(looseBalance);
 
@@ -103,7 +131,7 @@ contract GenericCompound is IGenericLender{
         }
 
         //not state changing but OK because of previous call
-        uint liquidity = want.balanceOf(address(cToken));
+        uint liquidity = bank.balance;
 
         if(liquidity > 1) {
             uint256 toWithdraw = amount.sub(looseBalance);
@@ -111,34 +139,24 @@ contract GenericCompound is IGenericLender{
             if(toWithdraw <= liquidity) {
 
                 //we can take all
-                cToken.redeemUnderlying(toWithdraw);
+                withdrawUnderlying(toWithdraw);
             } else {
                 //take all we can
-                cToken.redeemUnderlying(liquidity);
+                withdrawUnderlying(liquidity);
             }
         }
-        _disposeOfComp();
         looseBalance = want.balanceOf(address(this));
         want.safeTransfer(address(strategy),looseBalance);
         return looseBalance;
 
     }
 
-    function _disposeOfComp() internal {
-        uint256 _comp = IERC20(comp).balanceOf(address(this));
-
-        if (_comp > minCompToSell) {
-            address[] memory path = new address[](3);
-            path[0] = comp;
-            path[1] = weth;
-            path[2] = address(want);
-
-            IUniswapV2Router02(uniswapRouter).swapExactTokensForTokens(_comp, uint256(0), path, address(this), now);
-        }
-    }
     function deposit() external override management{
         uint256 balance = want.balanceOf(address(this));
-        cToken.mint(balance);
+
+        IWETH(weth).withdraw(balance);
+        Bank(bank).deposit{value: balance}();
+
 
     }
     function withdrawAll() external override management returns (bool){
@@ -154,35 +172,14 @@ contract GenericCompound is IGenericLender{
 
     }
     function hasAssets() external override view returns (bool){
-        return cToken.balanceOf(address(this)) > 0;
-
-    }
-
-    function aprAfterDeposit(uint256 amount) external override view returns (uint256){
-        uint256 cashPrior = want.balanceOf(address(cToken));
-
-        
-        uint256 borrows = cToken.totalBorrows();
-
-        
-        uint256 reserves = cToken.totalReserves();
-
-        uint256 reserverFactor = cToken.reserveFactorMantissa();
-
-        InterestRateModel model = cToken.interestRateModel();
-
-        //the supply rate is derived from the borrow rate, reserve factor and the amount of total borrows.
-        uint256 supplyRate = model.getSupplyRate(cashPrior.add(amount), borrows,reserves, reserverFactor );
-
-        return supplyRate.mul(blocksPerYear);
+        return Bank(bank).balanceOf(address(this)) > 0;
 
     }
 
     function protectedTokens() internal override view returns (address[] memory) {
-        address[] memory protected = new address[](3);
+        address[] memory protected = new address[](2);
         protected[0] = address(want);
-        protected[1] = address(cToken);
-        protected[2] = comp;
+        protected[1] = bank;
         return protected;
     }
 

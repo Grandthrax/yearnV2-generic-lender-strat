@@ -1,7 +1,6 @@
 pragma solidity ^0.6.12;
 pragma experimental ABIEncoderV2;
 
-import "../Interfaces/Compound/CErc20I.sol";
 import "../Interfaces/Compound/InterestRateModel.sol";
 import "@openzeppelinV3/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelinV3/contracts/math/SafeMath.sol";
@@ -10,38 +9,39 @@ import "@openzeppelinV3/contracts/token/ERC20/SafeERC20.sol";
 
 import "../Interfaces/UniswapInterfaces/IUniswapV2Router02.sol";
 
+import "../Interfaces/Compound/CEtherI.sol";
+import "../Interfaces/UniswapInterfaces/IWETH.sol";
 
 import "./IGenericLender.sol";
 
 /********************
- *   A lender plugin for LenderYieldOptimiser for any erc20 asset on compound (not eth)
+ *   A lender plugin for LenderYieldOptimiser for any erc20 asset on Cream (not eth)
  *   Made by SamPriestley.com
- *   https://github.com/Grandthrax/yearnv2/blob/master/contracts/GenericDyDx/GenericCompound.sol
+ *   https://github.com/Grandthrax/yearnv2/blob/master/contracts/GenericLender/GenericCream.sol
  *
  ********************* */
 
-contract GenericCompound is IGenericLender{
+contract EthCompound is IGenericLender{
 
     using SafeERC20 for IERC20;
     using Address for address;
     using SafeMath for uint256;
 
     uint256 private constant blocksPerYear = 2_300_000;
-    address public constant uniswapRouter = address(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
+    IWETH public constant weth = IWETH(address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2));
+    CEtherI public constant crETH = CEtherI(address(0x4Ddc2D193948926D02f9B1fE9e1daa0718270ED5));
     address public constant comp = address(0xc00e94Cb662C3520282E6f5717214004A7f26888);
-    address public constant weth = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+    address public constant uniswapRouter = address(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
 
     uint256 public minCompToSell = 0.5 ether;
 
-    CErc20I public cToken;
-    constructor(address _strategy,string memory name, address _cToken) public IGenericLender(_strategy, name) {
-        cToken = CErc20I(_cToken);
 
-        require(cToken.underlying() == address(want), "WRONG CTOKEN");
+    constructor(address _strategy,string memory name) public IGenericLender(_strategy, name) {
 
-        want.approve(_cToken, uint256(-1));
-
+        require(address(want) == address(weth), "NOT WETH");
     }
+    //to receive eth from weth
+    receive() external payable {}
 
     function nav() external override view returns (uint256){
         return _nav();
@@ -54,11 +54,11 @@ contract GenericCompound is IGenericLender{
     }
 
     function underlyingBalanceStored() public view returns (uint256 balance){
-        uint256 currentCr = cToken.balanceOf(address(this));
+        uint256 currentCr = crETH.balanceOf(address(this));
         if(currentCr == 0){
             balance = 0;
         }else{
-            balance = currentCr.mul(cToken.exchangeRateStored()).div(1e18);
+            balance = currentCr.mul(crETH.exchangeRateStored()).div(1e18);
         }
     }
 
@@ -66,7 +66,7 @@ contract GenericCompound is IGenericLender{
         return _apr();
     }
     function _apr() internal view returns (uint256){
-        return cToken.supplyRatePerBlock().mul(blocksPerYear);
+        return crETH.supplyRatePerBlock().mul(blocksPerYear);
     }
   
     function weightedApr() external override view  returns (uint256){
@@ -80,7 +80,10 @@ contract GenericCompound is IGenericLender{
 
     //emergency withdraw. sends balance plus amount to governance
     function emergencyWithdraw(uint256 amount) external override management{
-        cToken.redeemUnderlying(amount);
+        crETH.redeemUnderlying(amount);
+
+        //now turn to weth
+        weth.deposit{value: address(this).balance}();
         
         want.safeTransfer(vault.governance(),want.balanceOf(address(this)));
 
@@ -89,7 +92,7 @@ contract GenericCompound is IGenericLender{
     //withdraw an amount including any want balance
     function _withdraw(uint256 amount) internal  returns (uint256){
 
-        uint balanceUnderlying = cToken.balanceOfUnderlying(address(this));
+        uint balanceUnderlying = crETH.balanceOfUnderlying(address(this));
         uint looseBalance = want.balanceOf(address(this));
         uint total = balanceUnderlying.add(looseBalance);
 
@@ -103,21 +106,25 @@ contract GenericCompound is IGenericLender{
         }
 
         //not state changing but OK because of previous call
-        uint liquidity = want.balanceOf(address(cToken));
+        uint liquidity = crETH.getCash();
 
         if(liquidity > 1) {
             uint256 toWithdraw = amount.sub(looseBalance);
 
             if(toWithdraw <= liquidity) {
-
+                
                 //we can take all
-                cToken.redeemUnderlying(toWithdraw);
+                crETH.redeemUnderlying(toWithdraw);
             } else {
                 //take all we can
-                cToken.redeemUnderlying(liquidity);
+                crETH.redeemUnderlying(liquidity);
             }
         }
+
+        weth.deposit{value: address(this).balance}();
+
         _disposeOfComp();
+
         looseBalance = want.balanceOf(address(this));
         want.safeTransfer(address(strategy),looseBalance);
         return looseBalance;
@@ -128,19 +135,21 @@ contract GenericCompound is IGenericLender{
         uint256 _comp = IERC20(comp).balanceOf(address(this));
 
         if (_comp > minCompToSell) {
-            address[] memory path = new address[](3);
+            address[] memory path = new address[](2);
             path[0] = comp;
-            path[1] = weth;
-            path[2] = address(want);
+            path[1] = address(want);
 
             IUniswapV2Router02(uniswapRouter).swapExactTokensForTokens(_comp, uint256(0), path, address(this), now);
         }
     }
+
     function deposit() external override management{
         uint256 balance = want.balanceOf(address(this));
-        cToken.mint(balance);
 
+        weth.withdraw(balance);
+        crETH.mint{value: balance}();
     }
+
     function withdrawAll() external override management returns (bool){
         uint256 invested = _nav();
         uint256 returned = _withdraw(invested);
@@ -154,34 +163,42 @@ contract GenericCompound is IGenericLender{
 
     }
     function hasAssets() external override view returns (bool){
-        return cToken.balanceOf(address(this)) > 0;
+        return crETH.balanceOf(address(this)) > 0;
 
     }
 
     function aprAfterDeposit(uint256 amount) external override view returns (uint256){
-        uint256 cashPrior = want.balanceOf(address(cToken));
-
+        uint256 cashPrior =  crETH.getCash();
         
-        uint256 borrows = cToken.totalBorrows();
+        uint256 borrows = crETH.totalBorrows();
+        uint256 reserves = crETH.totalReserves();
 
-        
-        uint256 reserves = cToken.totalReserves();
+        uint256 exchangeRate = crETH.exchangeRateStored();
+        uint256 totalSupply = crETH.totalSupply();
 
-        uint256 reserverFactor = cToken.reserveFactorMantissa();
+        uint256 underlying = totalSupply.mul(exchangeRate).div(1e18).add(amount);
 
-        InterestRateModel model = cToken.interestRateModel();
+
+        uint256 reserverFactor = crETH.reserveFactorMantissa();
+        InterestRateModel model = crETH.interestRateModel();
 
         //the supply rate is derived from the borrow rate, reserve factor and the amount of total borrows.
-        uint256 supplyRate = model.getSupplyRate(cashPrior.add(amount), borrows,reserves, reserverFactor );
+        (,uint256 borrowRate) = model.getBorrowRate(cashPrior.add(amount), borrows,reserves);
+
+        uint256 borrowsPer= uint256(1e18).mul(borrows).div(underlying);
+
+        uint256 supplyRate = borrowRate.mul(uint256(1e18).sub(reserverFactor)).mul(borrowsPer).div(1e18).div(1e18);
+
 
         return supplyRate.mul(blocksPerYear);
 
     }
 
+
     function protectedTokens() internal override view returns (address[] memory) {
         address[] memory protected = new address[](3);
         protected[0] = address(want);
-        protected[1] = address(cToken);
+        protected[1] = address(crETH);
         protected[2] = comp;
         return protected;
     }

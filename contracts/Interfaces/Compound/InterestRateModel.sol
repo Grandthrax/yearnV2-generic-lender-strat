@@ -8,7 +8,7 @@ interface InterestRateModel {
       * @param reserves The total amount of reserves the market has
       * @return The borrow rate per block (as a percentage, and scaled by 1e18)
       */
-    function getBorrowRate(uint cash, uint borrows, uint reserves) external view returns (uint);
+    function getBorrowRate(uint cash, uint borrows, uint reserves) external view returns (uint, uint);
 
     /**
       * @notice Calculates the current supply interest rate per block

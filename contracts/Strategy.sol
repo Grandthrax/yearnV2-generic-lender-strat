@@ -169,6 +169,51 @@ contract Strategy is BaseStrategy{
         return weightedAPR.div(bal);
     }
 
+    function estimateAdjustPosition() public view returns (uint256 _lowest,uint256 _lowestApr, uint256 _highest,uint256 _potential){
+    
+        //all loose assets are to be invested
+        uint256 looseAssets = want.balanceOf(address(this));
+
+        // our simple algo
+        // get the lowest apr strat
+        // cycle through and see who could take its funds plus want for the highest apr
+        _lowestApr = uint256(-1);
+        _lowest = 0;
+        uint256 lowestNav = 0;
+        for(uint i = 0; i < lenders.length; i++){
+            if(lenders[i].hasAssets()){
+                uint256 apr = lenders[i].apr();
+                if(apr < _lowestApr){
+                    _lowestApr = apr;
+                    _lowest = i;
+                    lowestNav = lenders[i].nav();
+                }
+             }
+        }
+
+        uint256 toAdd = lowestNav.add(looseAssets);
+
+        uint256 highestApr = 0;
+        _highest = 0;
+
+        for(uint i = 0; i < lenders.length; i++){
+
+           
+            uint256 apr;
+            apr = lenders[i].aprAfterDeposit(looseAssets);
+           
+            if(apr > highestApr){
+                highestApr = apr;
+                _highest = i;
+            }
+             
+        }
+
+        //if we can improve apr by withdrawing we do so
+        _potential = lenders[_highest].aprAfterDeposit(toAdd);
+        
+    }
+
 
     //TODO: needs improvement. more complicated than limit increase
     function _estimateDebtLimitDecrease(uint256 change) internal view returns (uint256){
@@ -283,6 +328,7 @@ contract Strategy is BaseStrategy{
 
             if(amountToFree > 0 && looseAssets < amountToFree){
                 //withdraw what we can withdraw
+
                 _withdrawSome(amountToFree.sub(looseAssets));
                 uint256 newLoose = want.balanceOf(address(this));
 
@@ -315,53 +361,22 @@ contract Strategy is BaseStrategy{
             return;
         }
 
-        //all loose assets are to be invested
-        uint256 looseAssets = want.balanceOf(address(this));
+        
+        (uint256 lowest, uint256 lowestApr, uint256 highest, uint256 potential) = estimateAdjustPosition();
 
-        // our simple algo
-        // get the lowest apr strat
-        // cycle through and see who could take its funds plus want for the highest apr
-        uint256 lowestApr = uint256(-1);
-        uint256 lowest = 0;
-        uint256 lowestNav = 0;
-        for(uint i = 0; i < lenders.length; i++){
-            if(lenders[i].hasAssets()){
-                uint256 apr = lenders[i].apr();
-                if(apr < lowestApr){
-                    lowestApr = apr;
-                    lowest = i;
-                    lowestNav = lenders[i].nav();
-                }
-             }
-        }
-
-        uint256 toAdd = lowestNav.add(looseAssets);
-
-        uint256 highestApr = 0;
-        uint256 highest = 0;
-
-        for(uint i = 0; i < lenders.length; i++){
-
-           
-            uint256 apr;
-            apr = lenders[i].aprAfterDeposit(looseAssets);
-           
-            if(apr > highestApr){
-                highestApr = apr;
-                highest = i;
-            }
-             
-        }
-
-        //if we can improve apr by withdrawing we do so
-        uint256 potential = lenders[highest].aprAfterDeposit(toAdd);
         if(potential > lowestApr){
             //apr should go down after deposit so wont be withdrawing from self
             lenders[lowest].withdrawAll();
         }
 
-        want.safeTransfer(address(lenders[highest]), want.balanceOf(address(this)));
-        lenders[highest].deposit();
+        uint256 bal = want.balanceOf(address(this));
+        if(bal > 0)
+        {
+            want.safeTransfer(address(lenders[highest]),bal );
+            lenders[highest].deposit();
+
+        }
+        
 
     }
 
@@ -405,7 +420,12 @@ contract Strategy is BaseStrategy{
 
     //cycle through withdrawing from worst rate first
     function _withdrawSome(uint256 _amount) internal returns(uint256 amountWithdrawn) {
-     
+        //dont withdraw dust
+        if(_amount < debtThreshold){
+            return 0;
+        }
+
+        amountWithdrawn = 0;
         //most situations this will only run once. Only big withdrawals will be a gas guzzler
         while(amountWithdrawn < _amount){
             uint256 lowestApr = uint256(-1);
@@ -457,7 +477,29 @@ contract Strategy is BaseStrategy{
         }
     }
 
-    // NOTE: Can override `tendTrigger` and `harvestTrigger` if necessary
+    function tendTrigger(uint256 callCost) public override view returns (bool) {
+        // We usually don't need tend, but if there are positions that need active maintainence,
+        // overriding this function is how you would signal for that
+        if(harvestTrigger(callCost)){
+            return false;
+        }
+
+        //now let's check if there is better apr somewhere else. 
+        //If there is and profit potential is worth changing then lets do it
+        (uint256 lowest, uint256 lowestApr, , uint256 potential) = estimateAdjustPosition();
+
+        //if protential > lowestApr it means we are changing horses
+        if(potential > lowestApr){
+
+            uint256 nav = lenders[lowest].nav();
+
+            //profit increase is 1 days profit with new apr
+            uint256 profitIncrease = (nav.mul(potential) - nav.mul(lowestApr)).div(1e18).div(365);
+
+            return (profitFactor * callCost < profitIncrease);
+        }
+
+    }
 
     /*
      * Do anything necesseary to prepare this strategy for migration, such

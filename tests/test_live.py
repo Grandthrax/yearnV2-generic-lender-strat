@@ -24,8 +24,13 @@ def test_live_py(currency, live_GenericCompound_usdc_1, live_GenericCream_usdc_1
 
     #genericStateOfStrat(old_str, currency, vault)
     #genericStateOfVault(vault, currency)
-    genericStateOfStrat(live_strat_usdc_1, currency, vault)
-    genericStateOfVault(vault, currency)
+    #genericStateOfStrat(live_strat_usdc_1, currency, vault)
+    #genericStateOfVault(vault, currency)
+    status = live_strat_usdc_1.lendStatuses()
+    for j in status:
+        print(f"Lender: {j[0]}, Deposits: {formS.format(j[1]/1e6)}, APR: {form.format(j[2]/1e18)}")
+
+    live_strat_usdc_1.tend({'from': samdev})
     status = live_strat_usdc_1.lendStatuses()
     for j in status:
         print(f"Lender: {j[0]}, Deposits: {formS.format(j[1]/1e6)}, APR: {form.format(j[2]/1e18)}")

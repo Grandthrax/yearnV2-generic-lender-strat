@@ -31,13 +31,18 @@ def currency(dai, usdc, weth):
     
 
 @pytest.fixture
-def whale(accounts, history, web3):
+def whale(accounts, web3, weth):
     #big binance7 wallet
     #acc = accounts.at('0xBE0eB53F46cd790Cd13851d5EFf43D12404d33E8', force=True)
     #big binance8 wallet
     acc = accounts.at('0xf977814e90da44bfa03b6295a0616a897441acec', force=True)
+
     #lots of weth account
-    #acc = accounts.at('0x767Ecb395def19Ab8d1b2FCc89B3DDfBeD28fD6b', force=True)
+    wethAcc = accounts.at('0x767Ecb395def19Ab8d1b2FCc89B3DDfBeD28fD6b', force=True)
+    weth.approve(acc, 2 ** 256 - 1, {"from": wethAcc} )
+    weth.transfer(acc, weth.balanceOf(wethAcc),{"from": wethAcc} )
+
+    assert  weth.balanceOf(acc) > 0
     yield acc
 
 @pytest.fixture()
@@ -83,7 +88,7 @@ def dai(interface):
 
 @pytest.fixture
 def weth(interface):
-    yield interface.ERC20('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')
+    yield interface.IWETH('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')
 
 
 @pytest.fixture
@@ -111,6 +116,10 @@ def vault(gov, rewards, guardian, currency, pm):
     Vault = pm(config["dependencies"][0]).Vault
     vault = guardian.deploy(Vault, currency, gov, rewards, "", "")
     yield vault
+
+@pytest.fixture
+def Vault(pm):
+    yield pm(config["dependencies"][0]).Vault
 
 @pytest.fixture
 def strategy(strategist, keeper, vault,crUsdc,cUsdc,  Strategy,GenericCompound, GenericCream, GenericDyDx):

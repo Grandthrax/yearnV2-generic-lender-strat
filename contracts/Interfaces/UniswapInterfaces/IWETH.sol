@@ -1,11 +1,10 @@
 pragma solidity >=0.5.0;
-
-interface IWETH {
+import "@openzeppelinV3/contracts/token/ERC20/IERC20.sol";
+interface IWETH  is IERC20{
     function deposit() external payable;
 
-    function transfer(address to, uint256 value) external returns (bool);
-
+    function decimals() external view returns (uint256);
     function withdraw(uint256) external;
 
-    function balanceOf(address) external view returns (uint256);
+
 }
