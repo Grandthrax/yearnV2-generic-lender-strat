@@ -121,9 +121,11 @@ interface CTokenI {
     function getCash() external view returns (uint256);
 
     function accrueInterest() external returns (uint256);
-    
+
     function interestRateModel() external view returns (InterestRateModel);
+
     function totalReserves() external view returns (uint256);
+
     function reserveFactorMantissa() external view returns (uint256);
 
     function seize(

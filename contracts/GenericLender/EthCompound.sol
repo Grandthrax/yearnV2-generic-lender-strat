@@ -21,8 +21,7 @@ import "./IGenericLender.sol";
  *
  ********************* */
 
-contract EthCompound is IGenericLender{
-
+contract EthCompound is IGenericLender {
     using SafeERC20 for IERC20;
     using Address for address;
     using SafeMath for uint256;
@@ -35,84 +34,79 @@ contract EthCompound is IGenericLender{
 
     uint256 public minCompToSell = 0.5 ether;
 
-
-    constructor(address _strategy,string memory name) public IGenericLender(_strategy, name) {
-
+    constructor(address _strategy, string memory name) public IGenericLender(_strategy, name) {
         require(address(want) == address(weth), "NOT WETH");
     }
+
     //to receive eth from weth
     receive() external payable {}
 
-    function nav() external override view returns (uint256){
+    function nav() external view override returns (uint256) {
         return _nav();
-
     }
 
-    function _nav() internal view returns (uint256){
+    function _nav() internal view returns (uint256) {
         return want.balanceOf(address(this)).add(underlyingBalanceStored());
-
     }
 
-    function underlyingBalanceStored() public view returns (uint256 balance){
+    function underlyingBalanceStored() public view returns (uint256 balance) {
         uint256 currentCr = crETH.balanceOf(address(this));
-        if(currentCr == 0){
+        if (currentCr == 0) {
             balance = 0;
-        }else{
+        } else {
             balance = currentCr.mul(crETH.exchangeRateStored()).div(1e18);
         }
     }
 
-    function apr() external override view  returns (uint256){
+    function apr() external view override returns (uint256) {
         return _apr();
     }
-    function _apr() internal view returns (uint256){
+
+    function _apr() internal view returns (uint256) {
         return crETH.supplyRatePerBlock().mul(blocksPerYear);
     }
-  
-    function weightedApr() external override view  returns (uint256){
+
+    function weightedApr() external view override returns (uint256) {
         uint256 a = _apr();
         return a.mul(_nav());
     }
 
-    function withdraw(uint256 amount) external override management returns (uint256){
+    function withdraw(uint256 amount) external override management returns (uint256) {
         return _withdraw(amount);
     }
 
     //emergency withdraw. sends balance plus amount to governance
-    function emergencyWithdraw(uint256 amount) external override management{
+    function emergencyWithdraw(uint256 amount) external override management {
         crETH.redeemUnderlying(amount);
 
         //now turn to weth
         weth.deposit{value: address(this).balance}();
-        
-        want.safeTransfer(vault.governance(),want.balanceOf(address(this)));
 
+        want.safeTransfer(vault.governance(), want.balanceOf(address(this)));
     }
 
     //withdraw an amount including any want balance
-    function _withdraw(uint256 amount) internal  returns (uint256){
+    function _withdraw(uint256 amount) internal returns (uint256) {
+        uint256 balanceUnderlying = crETH.balanceOfUnderlying(address(this));
+        uint256 looseBalance = want.balanceOf(address(this));
+        uint256 total = balanceUnderlying.add(looseBalance);
 
-        uint balanceUnderlying = crETH.balanceOfUnderlying(address(this));
-        uint looseBalance = want.balanceOf(address(this));
-        uint total = balanceUnderlying.add(looseBalance);
-
-        if(amount > total) {
+        if (amount > total) {
             //cant withdraw more than we own
             amount = total;
         }
-        if(looseBalance >= amount){
-            want.safeTransfer(address(strategy),amount);
+        if (looseBalance >= amount) {
+            want.safeTransfer(address(strategy), amount);
             return amount;
         }
 
         //not state changing but OK because of previous call
-        uint liquidity = crETH.getCash();
+        uint256 liquidity = crETH.getCash();
 
-        if(liquidity > 1) {
+        if (liquidity > 1) {
             uint256 toWithdraw = amount.sub(looseBalance);
 
-            if(toWithdraw <= liquidity) {
-                
+            if (toWithdraw <= liquidity) {
                 //we can take all
                 crETH.redeemUnderlying(toWithdraw);
             } else {
@@ -126,9 +120,8 @@ contract EthCompound is IGenericLender{
         _disposeOfComp();
 
         looseBalance = want.balanceOf(address(this));
-        want.safeTransfer(address(strategy),looseBalance);
+        want.safeTransfer(address(strategy), looseBalance);
         return looseBalance;
-
     }
 
     function _disposeOfComp() internal {
@@ -143,33 +136,31 @@ contract EthCompound is IGenericLender{
         }
     }
 
-    function deposit() external override management{
+    function deposit() external override management {
         uint256 balance = want.balanceOf(address(this));
 
         weth.withdraw(balance);
         crETH.mint{value: balance}();
     }
 
-    function withdrawAll() external override management returns (bool){
+    function withdrawAll() external override management returns (bool) {
         uint256 invested = _nav();
         uint256 returned = _withdraw(invested);
         return returned >= invested;
-
     }
 
     //think about this
-    function enabled() external override view returns (bool){
+    function enabled() external view override returns (bool) {
         return true;
-
     }
-    function hasAssets() external override view returns (bool){
+
+    function hasAssets() external view override returns (bool) {
         return crETH.balanceOf(address(this)) > 0;
-
     }
 
-    function aprAfterDeposit(uint256 amount) external override view returns (uint256){
-        uint256 cashPrior =  crETH.getCash();
-        
+    function aprAfterDeposit(uint256 amount) external view override returns (uint256) {
+        uint256 cashPrior = crETH.getCash();
+
         uint256 borrows = crETH.totalBorrows();
         uint256 reserves = crETH.totalReserves();
 
@@ -178,29 +169,24 @@ contract EthCompound is IGenericLender{
 
         uint256 underlying = totalSupply.mul(exchangeRate).div(1e18).add(amount);
 
-
         uint256 reserverFactor = crETH.reserveFactorMantissa();
         InterestRateModel model = crETH.interestRateModel();
 
         //the supply rate is derived from the borrow rate, reserve factor and the amount of total borrows.
-        (,uint256 borrowRate) = model.getBorrowRate(cashPrior.add(amount), borrows,reserves);
+        (, uint256 borrowRate) = model.getBorrowRate(cashPrior.add(amount), borrows, reserves);
 
-        uint256 borrowsPer= uint256(1e18).mul(borrows).div(underlying);
+        uint256 borrowsPer = uint256(1e18).mul(borrows).div(underlying);
 
         uint256 supplyRate = borrowRate.mul(uint256(1e18).sub(reserverFactor)).mul(borrowsPer).div(1e18).div(1e18);
 
-
         return supplyRate.mul(blocksPerYear);
-
     }
 
-
-    function protectedTokens() internal override view returns (address[] memory) {
+    function protectedTokens() internal view override returns (address[] memory) {
         address[] memory protected = new address[](3);
         protected[0] = address(want);
         protected[1] = address(crETH);
         protected[2] = comp;
         return protected;
     }
-
 }
