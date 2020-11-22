@@ -35,7 +35,7 @@ def carlos(fn_isolation):
     
 
 @pytest.fixture
-def whale(accounts, web3, weth, gov):
+def whale(accounts, web3, weth):
     #big binance7 wallet
     #acc = accounts.at('0xBE0eB53F46cd790Cd13851d5EFf43D12404d33E8', force=True)
     #big binance8 wallet
@@ -45,9 +45,6 @@ def whale(accounts, web3, weth, gov):
     wethAcc = accounts.at('0x767Ecb395def19Ab8d1b2FCc89B3DDfBeD28fD6b', force=True)
     weth.approve(acc, 2 ** 256 - 1, {"from": wethAcc} )
     weth.transfer(acc, weth.balanceOf(wethAcc),{"from": wethAcc} )
-
-    weth.approve(acc, 2 ** 256 - 1, {"from": acc} )
-    weth.transfer(gov, Wei('100 ether'),{"from": acc} )
 
     assert  weth.balanceOf(acc) > 0
     yield acc

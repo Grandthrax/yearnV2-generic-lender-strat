@@ -250,4 +250,3 @@ def test_debt_increment_weth(weth,Strategy, chain,rewards, whale,gov,strategist,
         for j in status:
             print(f"Lender: {j[0]}, Deposits: {formS.format(j[1]/1e18)}, APR: {form.format(j[2]/1e18)}")
     
-    

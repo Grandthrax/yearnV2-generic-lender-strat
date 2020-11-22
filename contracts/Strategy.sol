@@ -91,6 +91,7 @@ contract Strategy is BaseStrategy {
         string name;
         uint256 assets;
         uint256 rate;
+        address add;
     }
 
     function lendStatuses() public view returns (lendStatus[] memory) {
@@ -98,6 +99,7 @@ contract Strategy is BaseStrategy {
         for (uint256 i = 0; i < lenders.length; i++) {
             lendStatus memory s;
             s.name = lenders[i].lenderName();
+            s.add = address(lenders[i]);
             s.assets = lenders[i].nav();
             s.rate = lenders[i].apr();
             statuses[i] = s;

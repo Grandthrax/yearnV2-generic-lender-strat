@@ -27,7 +27,7 @@ def live_GenericDyDx_usdc_1(GenericDyDx):
 #change these fixtures for generic tests
 @pytest.fixture
 def currency(dai, usdc, weth):
-    yield usdc
+    yield weth
 
 @pytest.fixture(autouse=True)
 def carlos(fn_isolation):
@@ -35,7 +35,7 @@ def carlos(fn_isolation):
     
 
 @pytest.fixture
-def whale(accounts, web3, weth, gov):
+def whale(accounts, web3, weth, gov, chain):
     #big binance7 wallet
     #acc = accounts.at('0xBE0eB53F46cd790Cd13851d5EFf43D12404d33E8', force=True)
     #big binance8 wallet
@@ -43,10 +43,9 @@ def whale(accounts, web3, weth, gov):
 
     #lots of weth account
     wethAcc = accounts.at('0x767Ecb395def19Ab8d1b2FCc89B3DDfBeD28fD6b', force=True)
-    weth.approve(acc, 2 ** 256 - 1, {"from": wethAcc} )
+
     weth.transfer(acc, weth.balanceOf(wethAcc),{"from": wethAcc} )
 
-    weth.approve(acc, 2 ** 256 - 1, {"from": acc} )
     weth.transfer(gov, Wei('100 ether'),{"from": acc} )
 
     assert  weth.balanceOf(acc) > 0
@@ -55,7 +54,7 @@ def whale(accounts, web3, weth, gov):
 @pytest.fixture()
 def strategist(accounts, whale, currency):
     decimals = currency.decimals()
-    currency.transfer(accounts[1], 100_000 * (10 ** decimals), {'from': whale})
+    currency.transfer(accounts[1], 100 * (10 ** decimals), {'from': whale})
     yield accounts[1]
 
 @pytest.fixture
@@ -111,12 +110,12 @@ def crUsdc(interface):
     yield interface.CErc20I('0x44fbeBd2F576670a6C33f6Fc0B00aA8c5753b322')
 
 
-#@pytest.fixture(autouse=True)
-#def isolation(fn_isolation):
-#    pass
-@pytest.fixture(scope="module", autouse=True)
-def shared_setup(module_isolation):
+@pytest.fixture(autouse=True)
+def isolation(fn_isolation):
     pass
+#@pytest.fixture(scope="module", autouse=True)
+#def shared_setup(module_isolation):
+#    pass
 
 @pytest.fixture
 def vault(gov, rewards, guardian, currency, pm):
@@ -129,17 +128,22 @@ def Vault(pm):
     yield pm(config["dependencies"][0]).Vault
 
 @pytest.fixture
-def strategy(strategist, keeper, vault,crUsdc,cUsdc,  Strategy,GenericCompound, GenericCream, GenericDyDx):
+def strategy(strategist, keeper, vault,EthCream,AlphaHomo,  Strategy,EthCompound):
     strategy = strategist.deploy(Strategy, vault)
     strategy.setKeeper(keeper)
 
-    compoundPlugin = strategist.deploy(GenericCompound, strategy, "Compound", cUsdc)
-    creamPlugin = strategist.deploy(GenericCream, strategy, "Cream", crUsdc)
-    dydxPlugin = strategist.deploy(GenericDyDx, strategy, "DyDx")
+    ethCreamPlugin = strategist.deploy(EthCream, strategy, "Cream")
+    strategy.addLender(ethCreamPlugin, {"from": strategist})
+
+    alphaHomoPlugin = strategist.deploy(AlphaHomo, strategy, "Alpha Homo")
+    strategy.addLender(alphaHomoPlugin, {"from": strategist})
+
+    compoundPlugin = strategist.deploy(EthCompound, strategy, "Compound")
     strategy.addLender(compoundPlugin, {"from": strategist})
-    assert strategy.numLenders() == 1
-    strategy.addLender(creamPlugin, {"from": strategist})
-    assert strategy.numLenders() == 2
-    strategy.addLender(dydxPlugin, {"from": strategist})
-    assert strategy.numLenders() == 3
+
+ 
+    yield strategy
+
+@pytest.fixture
+def strategy_deployed(strategy):
     yield strategy
