@@ -1,5 +1,6 @@
 import brownie
 import requests
+from brownie.network.state import Chain
 
 def genericStateOfStrat(strategy, currency, vault):
     decimals = currency.decimals()
@@ -30,3 +31,14 @@ def genericStateOfVault(vault, currency):
     balance = vault.totalDebt()/  (10 ** decimals)
     print("Loose balance in vault:", currency.balanceOf(vault)/  (10 ** decimals))
     print(f"Total Debt: {balance:.5f}")
+
+def deposit(amount, user, dai, vault):
+    #print('\n----user deposits----')
+    dai.approve(vault, amount, {'from': user})
+    #print('deposit amount:', amount.to('ether'))
+    vault.deposit(amount, {'from': user})    
+
+def sleep(chain, blocks):
+    timeN = chain.time()
+    endTime = blocks*13 + timeN
+    chain.mine(blocks,endTime)

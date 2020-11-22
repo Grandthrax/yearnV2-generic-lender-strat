@@ -29,10 +29,6 @@ def live_GenericDyDx_usdc_1(GenericDyDx):
 def currency(dai, usdc, weth):
     yield weth
 
-@pytest.fixture(autouse=True)
-def carlos(fn_isolation):
-    pass
-    
 
 @pytest.fixture
 def whale(accounts, web3, weth, gov, chain):

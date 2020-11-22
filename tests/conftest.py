@@ -30,7 +30,7 @@ def currency(dai, usdc, weth):
     yield usdc
 
 @pytest.fixture(autouse=True)
-def carlos(fn_isolation):
+def isolation(fn_isolation):
     pass
     
 
