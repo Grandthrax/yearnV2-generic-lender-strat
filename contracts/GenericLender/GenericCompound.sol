@@ -151,7 +151,8 @@ contract GenericCompound is IGenericLender {
     }
 
     function hasAssets() external view override returns (bool) {
-        return cToken.balanceOf(address(this)) > 0;
+        //return cToken.balanceOf(address(this)) > 0;
+        return cToken.balanceOf(address(this)) > 0 || want.balanceOf(address(this)) > 0;
     }
 
     function aprAfterDeposit(uint256 amount) external view override returns (uint256) {

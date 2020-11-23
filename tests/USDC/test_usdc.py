@@ -4,7 +4,7 @@ from useful_methods import  genericStateOfVault,genericStateOfStrat
 import random
 import brownie
 
-def test_good_migration(usdc,Strategy, chain, whale,gov,strategist,rando,vault, strategy):
+def test_good_migration(usdc,Strategy, chain, whale,gov,strategist,rando,vault, strategy, fn_isolation):
     currency = usdc
 
     usdc.approve(vault, 2 ** 256 - 1, {"from": whale} )
@@ -44,7 +44,7 @@ def test_good_migration(usdc,Strategy, chain, whale,gov,strategist,rando,vault, 
     assert vault.strategies(new_strategy)[4] == strategy_debt
     assert new_strategy.estimatedTotalAssets() > prior_position*0.999 or new_strategy.estimatedTotalAssets() < prior_position*1.001
 
-def test_normal_activity(usdc,Strategy, crUsdc,cUsdc, chain, whale,gov,strategist,rando,vault, strategy):
+def test_normal_activity(usdc,Strategy, crUsdc,cUsdc, chain, whale,gov,strategist,rando,vault, strategy, fn_isolation):
     starting_balance = usdc.balanceOf(strategist)
     currency = usdc
     decimals = currency.decimals()
@@ -52,24 +52,26 @@ def test_normal_activity(usdc,Strategy, crUsdc,cUsdc, chain, whale,gov,strategis
     usdc.approve(vault, 2 ** 256 - 1, {"from": whale} )
     usdc.approve(vault, 2 ** 256 - 1, {"from": strategist} )
     
-    deposit_limit = 1_000_000_000 *1e6
+    deposit_limit = 1_000_000_000 *(10 ** (decimals))
     vault.addStrategy(strategy, deposit_limit, deposit_limit, 500, {"from": gov})
 
     
     #our humble strategist deposits some test funds
-    depositAmount =  501 *1e6
+    depositAmount =  501 * (10 ** (decimals))
     vault.deposit(depositAmount, {"from": strategist})
 
     assert strategy.estimatedTotalAssets() == 0
+    chain.mine(1)
     assert strategy.harvestTrigger(1) == True
 
     strategy.harvest({"from": strategist})
 
     assert strategy.estimatedTotalAssets() >= depositAmount*0.999999 #losing some dust is ok
+
     assert strategy.harvestTrigger(1) == False
 
     #whale deposits as well
-    whale_deposit  =100_000 *1e6
+    whale_deposit  =100_000 *(10 ** (decimals))
     vault.deposit(whale_deposit, {"from": whale})
     assert strategy.harvestTrigger(1000) == True
     strategy.harvest({"from": strategist})
@@ -90,13 +92,15 @@ def test_normal_activity(usdc,Strategy, crUsdc,cUsdc, chain, whale,gov,strategis
             shareprice = vault.pricePerShare()
             
             shares = vault.balanceOf(whale)
+            print('whale has:', shares)
             sharesout = shares*percent/100
             expectedout = sharesout*(shareprice/1e18)*(10 ** (decimals*2))
             balanceBefore = currency.balanceOf(whale)
 
             vault.withdraw(sharesout, {'from': whale})
+            chain.mine(waitBlock)
             balanceAfter = currency.balanceOf(whale)
-            withdrawn = balanceAfter - balanceBefore
+            withdrawn = balanceAfter - balanceBefore            
             assert withdrawn > expectedout*0.99 and withdrawn < expectedout*1.01
 
        
@@ -110,8 +114,23 @@ def test_normal_activity(usdc,Strategy, crUsdc,cUsdc, chain, whale,gov,strategis
     shares = vault.balanceOf(strategist)
     expectedout = shares*(shareprice/1e18)*(10 ** (decimals*2))
     balanceBefore = currency.balanceOf(strategist)
+    print(balanceBefore)
+    #genericStateOfStrat(strategy, currency, vault)
+    #genericStateOfVault(vault, currency)
+    status = strategy.lendStatuses()
+    form = "{:.2%}"
+    formS = "{:,.0f}"
+    for j in status:
+        print(f"Lender: {j[0]}, Deposits: {formS.format(j[1]/1e6)}, APR: {form.format(j[2]/1e18)}")
     vault.withdraw(vault.balanceOf(strategist), {'from': strategist})
     balanceAfter = currency.balanceOf(strategist)
+    print('shares', vault.balanceOf(strategist))
+    print(balanceAfter)
+    #genericStateOfStrat(strategy, currency, vault)
+    #genericStateOfVault(vault, currency)
+    status = strategy.lendStatuses()
+
+    chain.mine(waitBlock)
     withdrawn = balanceAfter - balanceBefore
     assert withdrawn > expectedout*0.99 and withdrawn < expectedout*1.01
 
@@ -121,7 +140,7 @@ def test_normal_activity(usdc,Strategy, crUsdc,cUsdc, chain, whale,gov,strategis
 
 
 
-def test_debt_increase(usdc,Strategy, chain, whale,gov,strategist,rando,vault, strategy):
+def test_debt_increase(usdc,Strategy, chain, whale,gov,strategist,rando,vault, strategy, fn_isolation):
     
     currency = usdc
     usdc.approve(vault, 2 ** 256 - 1, {"from": whale} )
@@ -163,7 +182,7 @@ def test_debt_increase(usdc,Strategy, chain, whale,gov,strategist,rando,vault, s
         print(f"Lender: {j[0]}, Deposits: {formS.format(j[1]/1e6)}, APR: {form.format(j[2]/1e18)}")
     assert realApr > predictedApr*.999 and realApr <  predictedApr*1.001
 
-def test_vault_shares(strategy, chain, vault,cUsdc,  crUsdc, rewards,currency,gov, interface, whale, strategist):
+def test_vault_shares(strategy, chain, vault,cUsdc,  crUsdc, rewards,currency,gov, interface, whale, strategist, fn_isolation):
     deposit_limit = 100_000_000 *1e6
     vault.addStrategy(strategy, deposit_limit, deposit_limit, 500, {"from": gov})
     decimals = currency.decimals()
@@ -222,7 +241,7 @@ def test_vault_shares(strategy, chain, vault,cUsdc,  crUsdc, rewards,currency,go
 
     assert gov_share > whale_share
 
-def test_apr(strategy, chain, vault,cUsdc,  crUsdc, rewards,currency,gov, interface, whale, strategist):
+def test_apr(strategy, chain, vault,cUsdc,  crUsdc, rewards,currency,gov, interface, whale, strategist, fn_isolation):
     decimals = currency.decimals()
     deposit_limit = 100_000_000 *1e6
     vault.addStrategy(strategy, deposit_limit, deposit_limit, 500, {"from": gov})
@@ -276,7 +295,7 @@ def test_apr(strategy, chain, vault,cUsdc,  crUsdc, rewards,currency,gov, interf
     vault.withdraw(vault.balanceOf(andre), {"from": andre})
 
 
-def test_manual_override(Strategy, chain, vault,cUsdc,  crUsdc, rewards,currency,gov, GenericCompound, GenericCream, GenericDyDx, interface, whale, strategist):
+def test_manual_override(Strategy, chain, vault,cUsdc,  crUsdc, rewards,currency,gov, GenericCompound, GenericCream,fn_isolation, GenericDyDx, interface, whale, strategist):
     strategy = strategist.deploy(Strategy, vault)
     decimals = currency.decimals()
     compoundPlugin = strategist.deploy(GenericCompound, strategy, "Compound", cUsdc)

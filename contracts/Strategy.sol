@@ -30,7 +30,8 @@ contract Strategy is BaseStrategy {
         // You can set these parameters on deployment to whatever you want
         minReportDelay = 6300;
         profitFactor = 100;
-        debtThreshold = 1 gwei;
+
+        debtThreshold = 1000;
 
         //we do this horrible thing because you can't compare strings in solidity
         require(keccak256(bytes(apiVersion())) == keccak256(bytes(VaultAPI(_vault).apiVersion())), "WRONG VERSION");
@@ -72,10 +73,12 @@ contract Strategy is BaseStrategy {
 
                 //put the last index here
                 //remove last index
-                if (i != lenders.length) {
+                if (i != lenders.length-1) {
                     lenders[i] = lenders[lenders.length - 1];
                 }
-                delete lenders[lenders.length - 1];
+
+                //pop shortens array by 1 thereby deleting the last index
+                lenders.pop();
 
                 //if balance to spend
                 if (want.balanceOf(address(this)) > 0) {
@@ -172,6 +175,8 @@ contract Strategy is BaseStrategy {
             uint256 _potential
         )
     {
+
+
         //all loose assets are to be invested
         uint256 looseAssets = want.balanceOf(address(this));
 
@@ -349,6 +354,11 @@ contract Strategy is BaseStrategy {
      *
      */
     function adjustPosition(uint256 _debtOutstanding) internal override {
+        //we just keep all money in want if we dont have any lenders
+        if(lenders.length == 0){
+           return;
+        }
+
         _debtOutstanding; //ignored. we handle it in prepare return
         //emergency exit is dealt with at beginning of harvest
         if (emergencyExit) {
@@ -429,7 +439,7 @@ contract Strategy is BaseStrategy {
             if (!lenders[lowest].hasAssets()) {
                 return amountWithdrawn;
             }
-            amountWithdrawn += lenders[lowest].withdraw(_amount);
+            amountWithdrawn += lenders[lowest].withdraw(_amount - amountWithdrawn);
         }
     }
 
@@ -453,9 +463,10 @@ contract Strategy is BaseStrategy {
             return _amountNeeded;
         } else {
             uint256 received = _withdrawSome(_amountNeeded - _balance).add(_balance);
-            if (received > _amountNeeded) {
+            if (received >= _amountNeeded) {
                 return _amountNeeded;
             } else {
+               
                 return received;
             }
         }
