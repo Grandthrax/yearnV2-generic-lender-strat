@@ -10,11 +10,14 @@ abstract contract IGenericLender {
     IERC20 public want;
     string public lenderName;
 
+    uint256 public dust;
+
     constructor(address _strategy, string memory name) public {
         strategy = BaseStrategy(_strategy);
         vault = VaultAPI(strategy.vault());
         want = IERC20(vault.token());
         lenderName = name;
+        dust = 10000;
 
         want.approve(_strategy, uint256(-1));
     }
@@ -38,6 +41,10 @@ abstract contract IGenericLender {
     function hasAssets() external view virtual returns (bool);
 
     function aprAfterDeposit(uint256 amount) external view virtual returns (uint256);
+
+    function setDust(uint256 _dust) external management {
+        dust = _dust;
+    }
 
     function sweep(address _token) external management {
         address[] memory _protectedTokens = protectedTokens();

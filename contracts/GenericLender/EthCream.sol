@@ -30,6 +30,7 @@ contract EthCream is IGenericLender {
 
     constructor(address _strategy, string memory name) public IGenericLender(_strategy, name) {
         require(address(want) == address(weth), "NOT WETH");
+        dust = 10;
     }
 
     //to receive eth from weth
@@ -124,8 +125,18 @@ contract EthCream is IGenericLender {
 
     function withdrawAll() external override management returns (bool) {
         uint256 invested = _nav();
-        uint256 returned = _withdraw(invested);
-        return returned >= invested;
+
+        
+        uint256 balance = crETH.balanceOf(address(this));
+       
+        crETH.redeem(balance);
+      
+        uint256 withdrawn = address(this).balance;
+        IWETH(weth).deposit{value: withdrawn}();
+        uint256 returned =want.balanceOf(address(this));
+        want.safeTransfer(address(strategy), returned);
+
+        return returned.add(dust) >= invested;
     }
 
     //think about this
@@ -134,7 +145,7 @@ contract EthCream is IGenericLender {
     }
 
     function hasAssets() external view override returns (bool) {
-        return crETH.balanceOf(address(this)) > 0;
+        return crETH.balanceOf(address(this)) > dust;
     }
 
     function aprAfterDeposit(uint256 amount) external view override returns (uint256) {

@@ -27,7 +27,7 @@ def live_GenericDyDx_usdc_1(GenericDyDx):
 #change these fixtures for generic tests
 @pytest.fixture
 def currency(dai, usdc, weth):
-    yield usdc
+    yield weth
 
 @pytest.fixture(autouse=True)
 def carlos(fn_isolation):
@@ -52,7 +52,7 @@ def whale(accounts, web3, weth):
 @pytest.fixture()
 def strategist(accounts, whale, currency):
     decimals = currency.decimals()
-    currency.transfer(accounts[1], 100_000 * (10 ** decimals), {'from': whale})
+    currency.transfer(accounts[1], 100 * (10 ** decimals), {'from': whale})
     yield accounts[1]
 
 @pytest.fixture
@@ -126,17 +126,21 @@ def Vault(pm):
     yield pm(config["dependencies"][0]).Vault
 
 @pytest.fixture
-def strategy(strategist, keeper, vault,crUsdc,cUsdc,  Strategy,GenericCompound, GenericCream, GenericDyDx):
+def strategy(strategist, keeper, vault,crUsdc,cUsdc,  Strategy,EthCream, AlphaHomo,EthCompound, GenericDyDx):
     strategy = strategist.deploy(Strategy, vault)
     strategy.setKeeper(keeper)
 
-    compoundPlugin = strategist.deploy(GenericCompound, strategy, "Compound", cUsdc)
-    creamPlugin = strategist.deploy(GenericCream, strategy, "Cream", crUsdc)
-    dydxPlugin = strategist.deploy(GenericDyDx, strategy, "DyDx")
+    ethCreamPlugin = strategist.deploy(EthCream, strategy, "Cream")
+    strategy.addLender(ethCreamPlugin, {"from": strategist})
+
+    alphaHomoPlugin = strategist.deploy(AlphaHomo, strategy, "Alpha Homo")
+    strategy.addLender(alphaHomoPlugin, {"from": strategist})
+
+    compoundPlugin = strategist.deploy(EthCompound, strategy, "Compound")
     strategy.addLender(compoundPlugin, {"from": strategist})
-    assert strategy.numLenders() == 1
-    strategy.addLender(creamPlugin, {"from": strategist})
-    assert strategy.numLenders() == 2
+
+    dydxPlugin = strategist.deploy(GenericDyDx, strategy, "DyDx")
     strategy.addLender(dydxPlugin, {"from": strategist})
-    assert strategy.numLenders() == 3
+
+    assert strategy.numLenders() == 4
     yield strategy

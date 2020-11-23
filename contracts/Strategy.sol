@@ -303,6 +303,7 @@ contract Strategy is BaseStrategy {
         uint256 debt = vault.strategies(address(this)).totalDebt;
 
         if (total > debt) {
+
             _profit = total - debt;
             uint256 amountToFree = _profit.add(_debtPayment);
 
@@ -424,6 +425,7 @@ contract Strategy is BaseStrategy {
 
         amountWithdrawn = 0;
         //most situations this will only run once. Only big withdrawals will be a gas guzzler
+        uint256 j = 0;
         while (amountWithdrawn < _amount) {
             uint256 lowestApr = uint256(-1);
             uint256 lowest = 0;
@@ -437,9 +439,15 @@ contract Strategy is BaseStrategy {
                 }
             }
             if (!lenders[lowest].hasAssets()) {
+
                 return amountWithdrawn;
             }
             amountWithdrawn += lenders[lowest].withdraw(_amount - amountWithdrawn);
+            j++;
+            //dont want infinite loop
+            if(j >= 6){
+                return amountWithdrawn;
+            }
         }
     }
 

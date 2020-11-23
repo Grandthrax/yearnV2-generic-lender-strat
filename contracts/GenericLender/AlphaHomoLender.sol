@@ -30,7 +30,7 @@ contract AlphaHomo is IGenericLender {
 
     constructor(address _strategy, string memory name) public IGenericLender(_strategy, name) {
         require(address(want) == weth, "NOT WETH");
-
+        dust = 1e12;
         //want.approve(_cToken, uint256(-1));
     }
 
@@ -44,19 +44,16 @@ contract AlphaHomo is IGenericLender {
         return want.balanceOf(address(this)).add(underlyingBalanceStored());
     }
 
-    function bankBalance() internal view returns (uint256 _profit) {
-        Bank b = Bank(bank);
-        return b.balanceOf(address(this)).mul(b.totalETH().add(b.pendingInterest(0))).div(b.totalSupply());
-        //return b.debtShareToVal( b.balanceOf(address(this)));
-    }
-
     function withdrawUnderlying(uint256 amount) internal returns (uint256) {
         Bank b = Bank(bank);
 
-        uint256 shares = amount.mul(b.totalSupply()).div(b.totalETH());
+     
+        uint256 shares = amount.mul(b.totalSupply()).div(_bankTotalEth());
+        //uint256 shares = amount.mul(b.glbDebtVal().add(b.pendingInterest(0))).div(b.glbDebtShare());
         // uint256 shares = b.debtValToShare(amount);
         uint256 balance = b.balanceOf(address(this));
         if (shares > balance) {
+
             b.withdraw(balance);
         } else {
             b.withdraw(shares);
@@ -70,7 +67,21 @@ contract AlphaHomo is IGenericLender {
 
     function underlyingBalanceStored() public view returns (uint256 balance) {
         Bank b = Bank(bank);
-        return b.balanceOf(address(this)).mul(b.totalETH().add(b.pendingInterest(0))).div(b.totalSupply());
+        return b.balanceOf(address(this)).mul(_bankTotalEth()).div(b.totalSupply());
+        //return b.balanceOf(address(this)).mul(b.glbDebtVal().add(b.pendingInterest(0))).div(b.glbDebtShare());
+    }
+
+    function _bankTotalEth() internal view returns (uint256 _totalEth){
+        Bank b = Bank(bank);
+
+        uint256 interest = b.pendingInterest(0);
+        BankConfig config = BankConfig(b.config());
+        uint256 toReserve = interest.mul(config.getReservePoolBps()).div(10000);
+
+        uint256 glbDebtVal = b.glbDebtVal().add(interest);
+        uint256 reservePool = b.reservePool().add(toReserve);
+
+        _totalEth = bank.balance.add(glbDebtVal).sub(reservePool);
     }
 
     function apr() external view override returns (uint256) {
@@ -149,8 +160,18 @@ contract AlphaHomo is IGenericLender {
 
     function withdrawAll() external override management returns (bool) {
         uint256 invested = _nav();
-        uint256 returned = _withdraw(invested);
-        return returned >= invested;
+        Bank b = Bank(bank);
+     
+        uint256 balance = b.balanceOf(address(this));
+       
+        b.withdraw(balance);
+      
+        uint256 withdrawn = address(this).balance;
+        IWETH(weth).deposit{value: withdrawn}();
+        uint256 returned =want.balanceOf(address(this));
+        want.safeTransfer(address(strategy), returned);
+
+        return returned.add(dust) >= invested;
     }
 
     //think about this
@@ -159,7 +180,11 @@ contract AlphaHomo is IGenericLender {
     }
 
     function hasAssets() external view override returns (bool) {
-        return Bank(bank).balanceOf(address(this)) > 0;
+        uint256 bankBal = Bank(bank).balanceOf(address(this));
+        uint256 wantBal = want.balanceOf(address(this));
+
+        //adding apples to oranges but doesnt matter as we are just looking for rounding errors
+        return bankBal.add(wantBal) > dust;
     }
 
     function protectedTokens() internal view override returns (address[] memory) {

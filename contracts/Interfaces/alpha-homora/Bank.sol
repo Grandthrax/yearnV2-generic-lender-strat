@@ -7,6 +7,8 @@ interface Bank is IERC20 {
     function deposit() external payable;
 
     function glbDebtVal() external view returns (uint256);
+    function glbDebtShare() external view returns (uint256);
+    function reservePool() external view returns (uint256);
 
     function totalETH() external view returns (uint256);
 
