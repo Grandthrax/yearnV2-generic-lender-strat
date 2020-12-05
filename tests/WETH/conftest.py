@@ -24,6 +24,37 @@ def live_GenericCream_usdc_1(GenericCream):
 def live_GenericDyDx_usdc_1(GenericDyDx):
     yield GenericDyDx.at('0x6C842746F21Ca34542EDC6895dFfc8D4e7D2bC1c')
 
+
+
+@pytest.fixture
+def live_strat_weth_1(Strategy):
+    yield Strategy.at('0x520a45E22B1eB5D7bDe09A445e70708d2957B365')
+
+@pytest.fixture
+def live_vault_weth(pm):
+    Vault = pm(config["dependencies"][0]).Vault
+    yield Vault.at('0x18c447b7Ad755379B8800F1Ef5165E8542946Afd')
+
+
+@pytest.fixture
+def live_Alpha_Homo(AlphaHomo):
+    yield AlphaHomo.at('0xd0aC55591F3BFE3F30D0f3A662084d0e28673c47')
+
+@pytest.fixture
+def live_EthCompound(EthCompound):
+    yield EthCompound.at('0xA8F6263e27d1c9952320A3C0DCBB7ac0eEA99F8D')
+
+@pytest.fixture
+def live_dydxweth(GenericDyDx):
+    yield GenericDyDx.at('0x1F2699B3aaf3F04b61B99B776b4a21a08502AE73')
+
+
+@pytest.fixture
+def live_guest_list(pm):
+    TestGuestList = pm(config["dependencies"][0]).TestGuestList
+    yield TestGuestList.at('0x1403EEa5fFF87253658D755030a73dFBCA2993Ab')
+
+
 #change these fixtures for generic tests
 @pytest.fixture
 def currency(dai, usdc, weth):
@@ -58,6 +89,12 @@ def strategist(accounts, whale, currency):
 @pytest.fixture
 def samdev(accounts):
     yield accounts.at('0xC3D6880fD95E06C816cB030fAc45b3ffe3651Cb0', force=True)
+
+@pytest.fixture
+def devychad(accounts):
+    yield accounts.at('0x846e211e8ba920b353fb717631c015cf04061cc9', force=True)
+
+    
 @pytest.fixture
 def gov(accounts):
     yield accounts[3]

@@ -1,14 +1,13 @@
 from pathlib import Path
+import yaml
 
-from brownie import Strategy, accounts, config, network, project, web3
+from brownie import interface, accounts, network, web3, Wei, config
 from eth_utils import is_checksum_address
 
-
-API_VERSION = config["dependencies"][0].split("@")[-1]
+    
 Vault = project.load(
     Path.home() / ".brownie" / "packages" / config["dependencies"][0]
 ).Vault
-
 
 def get_address(msg: str) -> str:
     while True:
@@ -24,27 +23,33 @@ def get_address(msg: str) -> str:
 
 
 def main():
+
     print(f"You are using the '{network.show_active()}' network")
-    dev = accounts.load("dev")
+    account_name = input(f"What account to use?: ")
+    dev = accounts.load(account_name)
     print(f"You are using: 'dev' [{dev.address}]")
-
-    if input("Is there a Vault for this strategy already? y/[N]: ").lower() != "y":
-        vault = Vault.at(get_address("Deployed Vault: "))
-        assert vault.apiVersion() == API_VERSION
-    else:
-        return  # TODO: Deploy one using scripts from Vault project
-
+    token = interface.ERC20(get_address("ERC20 Token: "))
+    #token = Token.at("0x6B175474E89094C44Da98b954EedeAC495271d0F")
+    #gov = get_address("yEarn Governance: ")
+    gov = dev
+    #rewards = get_address("Rewards contract: ")
+    rewards = dev
+    #name = input(f"Set description ['yearn {token.name()}']: ") or ""
+    name = "WETH yVault"
+    #symbol = input(f"Set symbol ['y{token.symbol()}']: ") or ""
+    symbol = 'yvWETH'
     print(
         f"""
-    Strategy Parameters
+    Vault Parameters
 
-       api: {API_VERSION}
-     token: {vault.token()}
-      name: '{vault.name()}'
-    symbol: '{vault.symbol()}'
+     token: {token.address}
+  governer: {gov}
+   rewards: {rewards}
+      name: '{name or 'yearn ' + token.name()}'
+    symbol: '{symbol or 'y' + token.symbol()}'
     """
     )
-    if input("Deploy Strategy? y/[N]: ").lower() != "y":
+    if input("Deploy New Vault? y/[N]: ").lower() != "y":
         return
-
-    strategy = Strategy.deploy(vault, {"from": dev})
+    print("Deploying Vault...")
+    vault = Vault.deploy(token, gov, rewards, name, symbol,  {'from': dev, 'gas_price':Wei("35 gwei")})

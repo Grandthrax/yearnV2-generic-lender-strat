@@ -29,7 +29,7 @@ contract GenericDyDx is IGenericLender {
     address private constant SOLO = 0x1E0447b19BB6EcFdAe1e4AE1694b0C3659614e4e;
     uint256 public dydxMarketId;
 
-    constructor(address _strategy, string memory name) public IGenericLender(_strategy, name) {
+    constructor(address _strategy, address _cToken, string memory name) public IGenericLender(_strategy, name) {
         want.approve(SOLO, uint256(-1));
 
         ISoloMargin solo = ISoloMargin(SOLO);
