@@ -10,7 +10,7 @@ import "@openzeppelinV3/contracts/token/ERC20/SafeERC20.sol";
 import "../Interfaces/Compound/CEtherI.sol";
 import "../Interfaces/UniswapInterfaces/IWETH.sol";
 
-import "./IGenericLender.sol";
+import "./GenericLenderBase.sol";
 
 /********************
  *   A lender plugin for LenderYieldOptimiser for any erc20 asset on Cream (not eth)
@@ -19,7 +19,7 @@ import "./IGenericLender.sol";
  *
  ********************* */
 
-contract EthCream is IGenericLender {
+contract EthCream is GenericLenderBase {
     using SafeERC20 for IERC20;
     using Address for address;
     using SafeMath for uint256;
@@ -28,7 +28,7 @@ contract EthCream is IGenericLender {
     IWETH public constant weth = IWETH(address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2));
     CEtherI public constant crETH = CEtherI(address(0xD06527D5e56A3495252A528C4987003b712860eE));
 
-    constructor(address _strategy, string memory name) public IGenericLender(_strategy, name) {
+    constructor(address _strategy, string memory name) public GenericLenderBase(_strategy, name) {
         require(address(want) == address(weth), "NOT WETH");
         dust = 10;
     }

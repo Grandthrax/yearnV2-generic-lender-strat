@@ -12,7 +12,7 @@ import "../Interfaces/UniswapInterfaces/IUniswapV2Router02.sol";
 import "../Interfaces/Compound/CEtherI.sol";
 import "../Interfaces/UniswapInterfaces/IWETH.sol";
 
-import "./IGenericLender.sol";
+import "./GenericLenderBase.sol";
 
 /********************
  *   A lender plugin for LenderYieldOptimiser for any erc20 asset on Cream (not eth)
@@ -21,7 +21,7 @@ import "./IGenericLender.sol";
  *
  ********************* */
 
-contract EthCompound is IGenericLender {
+contract EthCompound is GenericLenderBase {
     using SafeERC20 for IERC20;
     using Address for address;
     using SafeMath for uint256;
@@ -34,7 +34,7 @@ contract EthCompound is IGenericLender {
 
     uint256 public minCompToSell = 0.5 ether;
 
-    constructor(address _strategy, string memory name) public IGenericLender(_strategy, name) {
+    constructor(address _strategy, string memory name) public GenericLenderBase(_strategy, name) {
         require(address(want) == address(weth), "NOT WETH");
         dust = 10;
     }

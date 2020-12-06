@@ -10,7 +10,7 @@ import "../Interfaces/alpha-homora/Bank.sol";
 import "../Interfaces/alpha-homora/BankConfig.sol";
 import "../Interfaces/UniswapInterfaces/IWETH.sol";
 
-import "./IGenericLender.sol";
+import "./GenericLenderBase.sol";
 
 /********************
  *   A lender plugin for LenderYieldOptimiser for any erc20 asset on Cream (not eth)
@@ -19,7 +19,7 @@ import "./IGenericLender.sol";
  *
  ********************* */
 
-contract AlphaHomo is IGenericLender {
+contract AlphaHomo is GenericLenderBase {
     using SafeERC20 for IERC20;
     using Address for address;
     using SafeMath for uint256;
@@ -28,7 +28,7 @@ contract AlphaHomo is IGenericLender {
     address public constant weth = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     address public constant bank = address(0x67B66C99D3Eb37Fa76Aa3Ed1ff33E8e39F0b9c7A);
 
-    constructor(address _strategy, string memory name) public IGenericLender(_strategy, name) {
+    constructor(address _strategy, string memory name) public GenericLenderBase(_strategy, name) {
         require(address(want) == weth, "NOT WETH");
         dust = 1e12;
         //want.approve(_cToken, uint256(-1));

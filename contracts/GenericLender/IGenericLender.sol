@@ -1,63 +1,31 @@
 pragma solidity 0.6.12;
 
-import "@yearnvaults/contracts/BaseStrategy.sol";
-import "@openzeppelinV3/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelinV3/contracts/math/SafeMath.sol";
+interface IGenericLender {
 
-abstract contract IGenericLender {
-    VaultAPI public vault;
-    BaseStrategy public strategy;
-    IERC20 public want;
-    string public lenderName;
+    function lenderName() external view returns (string memory);
+    
+    function nav() external view returns (uint256);
 
-    uint256 public dust;
+    function apr() external view returns (uint256);
 
-    constructor(address _strategy, string memory name) public {
-        strategy = BaseStrategy(_strategy);
-        vault = VaultAPI(strategy.vault());
-        want = IERC20(vault.token());
-        lenderName = name;
-        dust = 10000;
+    function weightedApr() external view returns (uint256);
 
-        want.approve(_strategy, uint256(-1));
-    }
+    function withdraw(uint256 amount) external  returns (uint256);
 
-    function nav() external view virtual returns (uint256);
+    function emergencyWithdraw(uint256 amount) external;
 
-    function apr() external view virtual returns (uint256);
+    function deposit() external;
 
-    function weightedApr() external view virtual returns (uint256);
+    function withdrawAll() external returns (bool);
 
-    function withdraw(uint256 amount) external virtual returns (uint256);
+    function enabled() external view returns (bool);
 
-    function emergencyWithdraw(uint256 amount) external virtual;
+    function hasAssets() external view returns (bool);
 
-    function deposit() external virtual;
+    function aprAfterDeposit(uint256 amount) external view returns (uint256);
 
-    function withdrawAll() external virtual returns (bool);
+    function setDust(uint256 _dust) external;
 
-    function enabled() external view virtual returns (bool);
+    function sweep(address _token) external;
 
-    function hasAssets() external view virtual returns (bool);
-
-    function aprAfterDeposit(uint256 amount) external view virtual returns (uint256);
-
-    function setDust(uint256 _dust) external management {
-        dust = _dust;
-    }
-
-    function sweep(address _token) external management {
-        address[] memory _protectedTokens = protectedTokens();
-        for (uint256 i; i < _protectedTokens.length; i++) require(_token != _protectedTokens[i], "!protected");
-
-        IERC20(_token).transfer(vault.governance(), IERC20(_token).balanceOf(address(this)));
-    }
-
-    function protectedTokens() internal view virtual returns (address[] memory);
-
-    //make sure to use
-    modifier management() {
-        require(msg.sender == address(strategy) || msg.sender == vault.governance() || msg.sender == strategy.strategist(), "!management");
-        _;
-    }
 }

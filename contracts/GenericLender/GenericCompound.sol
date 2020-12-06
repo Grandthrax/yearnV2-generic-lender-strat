@@ -10,7 +10,7 @@ import "@openzeppelinV3/contracts/token/ERC20/SafeERC20.sol";
 
 import "../Interfaces/UniswapInterfaces/IUniswapV2Router02.sol";
 
-import "./IGenericLender.sol";
+import "./GenericLenderBase.sol";
 
 /********************
  *   A lender plugin for LenderYieldOptimiser for any erc20 asset on compound (not eth)
@@ -19,7 +19,7 @@ import "./IGenericLender.sol";
  *
  ********************* */
 
-contract GenericCompound is IGenericLender {
+contract GenericCompound is GenericLenderBase {
     using SafeERC20 for IERC20;
     using Address for address;
     using SafeMath for uint256;
@@ -37,7 +37,7 @@ contract GenericCompound is IGenericLender {
         address _strategy,
         string memory name,
         address _cToken
-    ) public IGenericLender(_strategy, name) {
+    ) public GenericLenderBase(_strategy, name) {
         cToken = CErc20I(_cToken);
 
         require(cToken.underlying() == address(want), "WRONG CTOKEN");

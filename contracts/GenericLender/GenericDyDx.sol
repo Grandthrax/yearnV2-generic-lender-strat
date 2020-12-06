@@ -11,7 +11,7 @@ import "@openzeppelinV3/contracts/token/ERC20/SafeERC20.sol";
 
 import "../Interfaces/UniswapInterfaces/IUniswapV2Router02.sol";
 
-import "./IGenericLender.sol";
+import "./GenericLenderBase.sol";
 
 /********************
  *   A lender plugin for LenderYieldOptimiser for DyDx
@@ -20,7 +20,7 @@ import "./IGenericLender.sol";
  *
  ********************* */
 
-contract GenericDyDx is IGenericLender {
+contract GenericDyDx is GenericLenderBase {
     using SafeERC20 for IERC20;
     using Address for address;
     using SafeMath for uint256;
@@ -29,7 +29,7 @@ contract GenericDyDx is IGenericLender {
     address private constant SOLO = 0x1E0447b19BB6EcFdAe1e4AE1694b0C3659614e4e;
     uint256 public dydxMarketId;
 
-    constructor(address _strategy, address _cToken, string memory name) public IGenericLender(_strategy, name) {
+    constructor(address _strategy,  string memory name) public GenericLenderBase(_strategy, name) {
         want.approve(SOLO, uint256(-1));
 
         ISoloMargin solo = ISoloMargin(SOLO);

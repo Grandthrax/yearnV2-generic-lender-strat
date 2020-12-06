@@ -1,8 +1,10 @@
+// SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.6.12;
-
 pragma experimental ABIEncoderV2;
 
 import "./GenericLender/IGenericLender.sol";
+import "./WantToEthOracle/IWantToEth.sol";
+
 import "@yearnvaults/contracts/BaseStrategy.sol";
 
 import "@openzeppelinV3/contracts/token/ERC20/IERC20.sol";
@@ -11,11 +13,22 @@ import "@openzeppelinV3/contracts/math/Math.sol";
 import "@openzeppelinV3/contracts/utils/Address.sol";
 import "@openzeppelinV3/contracts/token/ERC20/SafeERC20.sol";
 
+interface IUni{
+    function getAmountsOut(
+        uint256 amountIn, 
+        address[] calldata path
+    ) external view returns (uint256[] memory amounts);
+}
+
 /********************
+ *
  *   A lender optimisation strategy for any erc20 asset
- *   Made by SamPriestley.com
  *   https://github.com/Grandthrax/yearnV2-generic-lender-strat
- *   v0.2.0
+ *   v0.2.2
+ *
+ *   This strategy works by taking plugins designed for standard lending platforms
+ *   It automatically chooses the best yield generating platform and adjusts accordingly
+ *   The adjustment is sub optimal so there is an additional option to manually set position
  *
  ********************* */
 
@@ -24,12 +37,14 @@ contract Strategy is BaseStrategy {
     using Address for address;
     using SafeMath for uint256;
 
+    address public constant uniswapRouter = address(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
+    address public constant weth = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+
     IGenericLender[] public lenders;
+    bool public externalOracle = false;
+    address public wantToEthOracle;
 
     constructor(address _vault) public BaseStrategy(_vault) {
-        // You can set these parameters on deployment to whatever you want
-        minReportDelay = 6300;
-        profitFactor = 100;
 
         debtThreshold = 1000;
 
@@ -37,14 +52,16 @@ contract Strategy is BaseStrategy {
         require(keccak256(bytes(apiVersion())) == keccak256(bytes(VaultAPI(_vault).apiVersion())), "WRONG VERSION");
     }
 
-    // ******** OVERRIDE THESE METHODS FROM BASE CONTRACT ************
+    function setPriceOracle(address _oracle) external management{
+        wantToEthOracle = _oracle;
+    }
 
     function name() external pure override returns (string memory) {
-        // Add your own name here, suggestion e.g. "StrategyCreamYFI"
         return "StrategyLenderYieldOptimiser";
     }
 
     //management functions
+    //add lenders for the strategy to choose between
     function addLender(address a) public management {
         IGenericLender n = IGenericLender(a);
 
@@ -62,6 +79,7 @@ contract Strategy is BaseStrategy {
         _removeLender(a, true);
     }
 
+    //force removes the lender even if it still has a balance
     function _removeLender(address a, bool force) internal {
         for (uint256 i = 0; i < lenders.length; i++) {
             if (a == address(lenders[i])) {
@@ -80,7 +98,7 @@ contract Strategy is BaseStrategy {
                 //pop shortens array by 1 thereby deleting the last index
                 lenders.pop();
 
-                //if balance to spend
+                //if balance to spend we might as well put it into the best lender
                 if (want.balanceOf(address(this)) > 0) {
                     adjustPosition(0);
                 }
@@ -90,6 +108,7 @@ contract Strategy is BaseStrategy {
         require(false, "NOT LENDER");
     }
 
+    //we could make this more gas efficient but it is only used by a view function
     struct lendStatus {
         string name;
         uint256 assets;
@@ -97,6 +116,7 @@ contract Strategy is BaseStrategy {
         address add;
     }
 
+    //Returns the status of all lenders attached the strategy
     function lendStatuses() public view returns (lendStatus[] memory) {
         lendStatus[] memory statuses = new lendStatus[](lenders.length);
         for (uint256 i = 0; i < lenders.length; i++) {
@@ -123,6 +143,8 @@ contract Strategy is BaseStrategy {
         return lenders.length;
     }
 
+
+    //the weighted apr of all lenders. sum(nav * apr)/totalNav
     function estimatedAPR() public view returns (uint256) {
         uint256 bal = estimatedTotalAssets();
         if (bal == 0) {
@@ -138,6 +160,7 @@ contract Strategy is BaseStrategy {
         return weightedAPR.div(bal);
     }
 
+    //Estimates the impact on APR if we add more money. It does not take into account adjusting position
     function _estimateDebtLimitIncrease(uint256 change) internal view returns (uint256) {
         uint256 highestAPR = 0;
         uint256 aprChoice = 0;
@@ -165,6 +188,38 @@ contract Strategy is BaseStrategy {
         return weightedAPR.div(bal);
     }
 
+    //Estimates debt limit decrease. It is not accurate and should only be used for very broad decision making
+    function _estimateDebtLimitDecrease(uint256 change) internal view returns (uint256) {
+        uint256 lowestApr = uint256(-1);
+        uint256 aprChoice = 0;
+
+        for (uint256 i = 0; i < lenders.length; i++) {
+            uint256 apr = lenders[i].aprAfterDeposit(change);
+            if (apr < lowestApr) {
+                aprChoice = i;
+                lowestApr = apr;
+            }
+        }
+
+        uint256 weightedAPR = 0;
+
+        for (uint256 i = 0; i < lenders.length; i++) {
+            if (i != aprChoice) {
+                weightedAPR += lenders[i].weightedApr();
+            } else {
+                uint256 asset = lenders[i].nav();
+                if (asset < change) {
+                    //simplistic. not accurate
+                    change = asset;
+                }
+                weightedAPR += lowestApr.mul(change);
+            }
+        }
+        uint256 bal = estimatedTotalAssets().add(change);
+        return weightedAPR.div(bal);
+    }
+
+    //estimates highest and lowest apr lenders. Public for debugging purposes but not much use to general public
     function estimateAdjustPosition()
         public
         view
@@ -175,8 +230,6 @@ contract Strategy is BaseStrategy {
             uint256 _potential
         )
     {
-
-
         //all loose assets are to be invested
         uint256 looseAssets = want.balanceOf(address(this));
 
@@ -216,37 +269,7 @@ contract Strategy is BaseStrategy {
         _potential = lenders[_highest].aprAfterDeposit(toAdd);
     }
 
-    //TODO: needs improvement. more complicated than limit increase
-    function _estimateDebtLimitDecrease(uint256 change) internal view returns (uint256) {
-        uint256 lowestApr = uint256(-1);
-        uint256 aprChoice = 0;
-
-        for (uint256 i = 0; i < lenders.length; i++) {
-            uint256 apr = lenders[i].aprAfterDeposit(change);
-            if (apr < lowestApr) {
-                aprChoice = i;
-                lowestApr = apr;
-            }
-        }
-
-        uint256 weightedAPR = 0;
-
-        for (uint256 i = 0; i < lenders.length; i++) {
-            if (i != aprChoice) {
-                weightedAPR += lenders[i].weightedApr();
-            } else {
-                uint256 asset = lenders[i].nav();
-                if (asset < change) {
-                    //simplistic. not accurate
-                    change = asset;
-                }
-                weightedAPR += lowestApr.mul(change);
-            }
-        }
-        uint256 bal = estimatedTotalAssets().add(change);
-        return weightedAPR.div(bal);
-    }
-
+    //gives estiomate of future APR with a change of debt limit. Useful for governance to decide debt limits
     function estimatedFutureAPR(uint256 newDebtLimit) public view returns (uint256) {
         uint256 oldDebtLimit = vault.strategies(address(this)).totalDebt;
         uint256 change;
@@ -270,7 +293,7 @@ contract Strategy is BaseStrategy {
 
     //we need to free up profit plus _debtOutstanding.
     //If _debtOutstanding is more than we can free we get as much as possible
-    // should be no way for there to be a loss. we hope..
+    // should be no way for there to be a loss. we hope...
     function prepareReturn(uint256 _debtOutstanding)
         internal
         override
@@ -325,6 +348,8 @@ contract Strategy is BaseStrategy {
                 }
             }
         } else {
+
+            //serious loss should never happen but if it does lets record it accurately
             _loss = debt - total;
             uint256 amountToFree = _loss.add(_debtPayment);
 
@@ -352,7 +377,6 @@ contract Strategy is BaseStrategy {
      *   The algorithm moves assets from lowest return to highest
      *   like a very slow idiots bubble sort
      *   we ignore debt outstanding for an easy life
-     *
      */
     function adjustPosition(uint256 _debtOutstanding) internal override {
         //we just keep all money in want if we dont have any lenders
@@ -386,7 +410,7 @@ contract Strategy is BaseStrategy {
         uint16 share;
     }
 
-    //share should add up to 1000.
+    //share must add up to 1000.
     function manualAllocation(lenderRatio[] memory _newPositions) public management {
         uint256 share = 0;
 
@@ -451,12 +475,8 @@ contract Strategy is BaseStrategy {
         }
     }
 
-    function exitPosition() internal override returns (uint256 _loss, uint256 _debtPayment) {
-        uint256 balance = lentTotalAssets();
-        if (balance > 0) {
-            _withdrawSome(balance);
-        }
-        _debtPayment = want.balanceOf(address(this));
+    function exitPosition(uint256 _debtOutstanding) internal override returns ( uint256 _profit, uint256 _loss, uint256 _debtPayment) {
+        return prepareReturn(_debtOutstanding);
     }
 
     /*
@@ -480,9 +500,44 @@ contract Strategy is BaseStrategy {
         }
     }
 
+    function harvestTrigger(uint256 callCost) public override view returns (bool) {
+        uint256 wantCallCost = _callCostToWant(callCost);
+
+        return super.harvestTrigger(wantCallCost);
+    }
+
+    function ethToWant(uint256 _amount) internal view returns (uint256){
+       
+        address[] memory path = new address[](2);
+        path = new address[](2);
+        path[0] = weth;
+        path[1] = address(want); 
+ 
+        uint256[] memory amounts = IUni(uniswapRouter).getAmountsOut(_amount, path);
+
+        return amounts[amounts.length - 1];
+    }
+
+    function _callCostToWant(uint256 callCost) internal view returns (uint256){
+        uint256 wantCallCost;
+
+        //three situations
+        //1 currency is eth so no change.
+        //2 we use uniswap swap price
+        //3 we use external oracle
+        if(address(want) == weth){
+            wantCallCost = callCost;
+        }else if(wantToEthOracle == address(0)){
+            wantCallCost = ethToWant(callCost);
+        }else{
+            wantCallCost = IWantToEth(wantToEthOracle).ethToWant(callCost);
+        }
+
+        return wantCallCost;
+    }
+
     function tendTrigger(uint256 callCost) public view override returns (bool) {
-        // We usually don't need tend, but if there are positions that need active maintainence,
-        // overriding this function is how you would signal for that
+        // make sure to call tendtrigger with same callcost as harvestTrigger
         if (harvestTrigger(callCost)) {
             return false;
         }
@@ -498,34 +553,26 @@ contract Strategy is BaseStrategy {
             //profit increase is 1 days profit with new apr
             uint256 profitIncrease = (nav.mul(potential) - nav.mul(lowestApr)).div(1e18).div(365);
 
-            return (profitFactor * callCost < profitIncrease);
+            uint256 wantCallCost = _callCostToWant(callCost);
+
+            return (wantCallCost * callCost < profitIncrease);
         }
     }
 
     /*
-     * Do anything necesseary to prepare this strategy for migration, such
-     * as transfering any reserve or LP tokens, CDPs, or other tokens or stores of value.
+     * revert if we can't withdraw full balance
      */
     function prepareMigration(address _newStrategy) internal override {
-        exitPosition();
+        uint256 outstanding = vault.strategies(address(this)).totalDebt;
+        (,uint loss, uint wantBalance) = prepareReturn(outstanding);
+
+        require(wantBalance.add(loss) >= outstanding, "LIQUIDITY LOCKED");
         want.safeTransfer(_newStrategy, want.balanceOf(address(this)));
     }
 
-    // Override this to add all tokens/tokenized positions this contract manages
-    // on a *persistant* basis (e.g. not just for swapping back to want ephemerally)
-    // NOTE: Do *not* include `want`, already included in `sweep` below
-    //
-    // Example:
-    //
-    //    function protectedTokens() internal override view returns (address[] memory) {
-    //      address[] memory protected = new address[](3);
-    //      protected[0] = tokenA;
-    //      protected[1] = tokenB;
-    //      protected[2] = tokenC;
-    //      return protected;
-    //    }
+
     function protectedTokens() internal view override returns (address[] memory) {
-        address[] memory protected = new address[](2);
+        address[] memory protected = new address[](1);
         protected[0] = address(want);
         return protected;
     }

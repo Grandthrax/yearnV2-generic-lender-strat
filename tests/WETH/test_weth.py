@@ -120,6 +120,9 @@ def test_tend_trigger_weth(weth,Strategy, chain,rewards, whale,gov,strategist,ra
     bank.deposit({"from": whale, "value": balance})
     chain.sleep(10)
     chain.mine(1)
+    status = strategy.lendStatuses()
+    for j in status:
+        print(f"Lender: {j[0]}, Deposits: {formS.format(j[1]/1e18)}, APR: {form.format(j[2]/1e18)}")
     assert strategy.tendTrigger(1*1e18) == False
     assert strategy.tendTrigger(1e14) == True
     status = strategy.lendStatuses()
