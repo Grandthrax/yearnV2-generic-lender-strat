@@ -52,7 +52,7 @@ contract Strategy is BaseStrategy {
         require(keccak256(bytes(apiVersion())) == keccak256(bytes(VaultAPI(_vault).apiVersion())), "WRONG VERSION");
     }
 
-    function setPriceOracle(address _oracle) external management{
+    function setPriceOracle(address _oracle) external onlyAuthorized{
         wantToEthOracle = _oracle;
     }
 
@@ -62,8 +62,10 @@ contract Strategy is BaseStrategy {
 
     //management functions
     //add lenders for the strategy to choose between
-    function addLender(address a) public management {
+    // only governance to stop strategist adding dodgy lender
+    function addLender(address a) public onlyGovernance {
         IGenericLender n = IGenericLender(a);
+        require(n.strategy() == address(this), "Undocked Lender");
 
         for (uint256 i = 0; i < lenders.length; i++) {
             require(a != address(lenders[i]), "Already Added");
@@ -71,11 +73,12 @@ contract Strategy is BaseStrategy {
         lenders.push(n);
     }
 
-    function safeRemoveLender(address a) public management {
+    //but strategist can remove for safety
+    function safeRemoveLender(address a) public onlyAuthorized {
         _removeLender(a, false);
     }
 
-    function forceRemoveLender(address a) public management {
+    function forceRemoveLender(address a) public onlyAuthorized {
         _removeLender(a, true);
     }
 
@@ -343,7 +346,7 @@ contract Strategy is BaseStrategy {
                         _profit = newLoose;
                         _debtPayment = 0;
                     } else {
-                        _debtPayment = Math.min(newLoose - _loss, _profit);
+                        _debtPayment = Math.min(newLoose - _profit, _debtPayment);
                     }
                 }
             }
@@ -411,7 +414,7 @@ contract Strategy is BaseStrategy {
     }
 
     //share must add up to 1000.
-    function manualAllocation(lenderRatio[] memory _newPositions) public management {
+    function manualAllocation(lenderRatio[] memory _newPositions) public onlyAuthorized {
         uint256 share = 0;
 
         for (uint256 i = 0; i < lenders.length; i++) {
@@ -577,8 +580,4 @@ contract Strategy is BaseStrategy {
         return protected;
     }
 
-    modifier management() {
-        require(msg.sender == governance() || msg.sender == strategist, "!management");
-        _;
-    }
 }

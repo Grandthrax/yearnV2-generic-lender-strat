@@ -31,10 +31,22 @@ def live_strat_weth_1(Strategy):
     yield Strategy.at('0x520a45E22B1eB5D7bDe09A445e70708d2957B365')
 
 @pytest.fixture
+def live_strat_weth_2(Strategy):
+    yield Strategy.at('0x460612682cE6ED51C1A9813F6938671D9D135d6D')
+
+@pytest.fixture
+def live_vault_weth_2(pm):
+    Vault = pm(config["dependencies"][0]).Vault
+    yield Vault.at('0x6392e8fa0588CB2DCb7aF557FdC9D10FDe48A325')
+
+@pytest.fixture
 def live_vault_weth(pm):
     Vault = pm(config["dependencies"][0]).Vault
     yield Vault.at('0x18c447b7Ad755379B8800F1Ef5165E8542946Afd')
 
+@pytest.fixture
+def live_Alpha_Homo_2(AlphaHomo):
+    yield AlphaHomo.at('0x74bE25172F8aFFF92CA6e27418d601D74ACC2525')
 
 @pytest.fixture
 def live_Alpha_Homo(AlphaHomo):
@@ -99,7 +111,9 @@ def devychad(accounts):
 def gov(accounts):
     yield accounts[3]
 
-
+@pytest.fixture
+def ychad(accounts):
+    yield accounts.at('0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52', force=True)
 
 @pytest.fixture
 def rewards(gov):

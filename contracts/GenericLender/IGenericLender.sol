@@ -5,6 +5,7 @@ interface IGenericLender {
     function lenderName() external view returns (string memory);
     
     function nav() external view returns (uint256);
+    function strategy() external view returns (address);
 
     function apr() external view returns (uint256);
 

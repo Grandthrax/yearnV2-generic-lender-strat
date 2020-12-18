@@ -1,13 +1,10 @@
 from pathlib import Path
 import yaml
+import click
 
-from brownie import interface, accounts, network, web3, Wei, config
+from brownie import interface, config, accounts, network, web3
 from eth_utils import is_checksum_address
 
-    
-Vault = project.load(
-    Path.home() / ".brownie" / "packages" / config["dependencies"][0]
-).Vault
 
 def get_address(msg: str) -> str:
     while True:
@@ -23,33 +20,28 @@ def get_address(msg: str) -> str:
 
 
 def main():
-
+    Vault = pm(config["dependencies"][0]).Vault
     print(f"You are using the '{network.show_active()}' network")
-    account_name = input(f"What account to use?: ")
-    dev = accounts.load(account_name)
+    dev = accounts.load(click.prompt("Account", type=click.Choice(accounts.load())))
     print(f"You are using: 'dev' [{dev.address}]")
     token = interface.ERC20(get_address("ERC20 Token: "))
-    #token = Token.at("0x6B175474E89094C44Da98b954EedeAC495271d0F")
-    #gov = get_address("yEarn Governance: ")
-    gov = dev
-    #rewards = get_address("Rewards contract: ")
-    rewards = dev
-    #name = input(f"Set description ['yearn {token.name()}']: ") or ""
-    name = "WETH yVault"
-    #symbol = input(f"Set symbol ['y{token.symbol()}']: ") or ""
-    symbol = 'yvWETH'
+    gov = get_address("Yearn Governance [ychad.eth]: ")
+    rewards = get_address(
+        "Rewards contract [0x93A62dA5a14C80f265DAbC077fCEE437B1a0Efde]: "
+    )
+    name = input(f"Set description ['{token.name()} yVault']: ") or ""
+    symbol = input(f"Set symbol ['yv{token.symbol()}']: ") or ""
     print(
         f"""
     Vault Parameters
-
      token: {token.address}
   governer: {gov}
    rewards: {rewards}
-      name: '{name or 'yearn ' + token.name()}'
-    symbol: '{symbol or 'y' + token.symbol()}'
+      name: '{token.name() + 'yVault'}'
+    symbol: '{'yv' + token.symbol()}'
     """
     )
     if input("Deploy New Vault? y/[N]: ").lower() != "y":
         return
     print("Deploying Vault...")
-    vault = Vault.deploy(token, gov, rewards, name, symbol,  {'from': dev, 'gas_price':Wei("35 gwei")})
+    vault = dev.deploy(Vault, token, gov, rewards, name, symbol)
