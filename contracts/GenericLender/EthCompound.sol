@@ -147,14 +147,13 @@ contract EthCompound is GenericLenderBase {
     function withdrawAll() external override management returns (bool) {
         uint256 invested = _nav();
 
-        
         uint256 balance = crETH.balanceOf(address(this));
-       
+
         crETH.redeem(balance);
-      
+
         uint256 withdrawn = address(this).balance;
         IWETH(weth).deposit{value: withdrawn}();
-        uint256 returned =want.balanceOf(address(this));
+        uint256 returned = want.balanceOf(address(this));
         want.safeTransfer(address(strategy), returned);
 
         return returned.add(dust) >= invested;

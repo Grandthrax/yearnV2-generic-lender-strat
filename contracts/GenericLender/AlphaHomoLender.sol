@@ -47,13 +47,11 @@ contract AlphaHomo is GenericLenderBase {
     function withdrawUnderlying(uint256 amount) internal returns (uint256) {
         Bank b = Bank(bank);
 
-     
         uint256 shares = amount.mul(b.totalSupply()).div(_bankTotalEth());
         //uint256 shares = amount.mul(b.glbDebtVal().add(b.pendingInterest(0))).div(b.glbDebtShare());
         // uint256 shares = b.debtValToShare(amount);
         uint256 balance = b.balanceOf(address(this));
         if (shares > balance) {
-
             b.withdraw(balance);
         } else {
             b.withdraw(shares);
@@ -71,7 +69,7 @@ contract AlphaHomo is GenericLenderBase {
         //return b.balanceOf(address(this)).mul(b.glbDebtVal().add(b.pendingInterest(0))).div(b.glbDebtShare());
     }
 
-    function _bankTotalEth() internal view returns (uint256 _totalEth){
+    function _bankTotalEth() internal view returns (uint256 _totalEth) {
         Bank b = Bank(bank);
 
         uint256 interest = b.pendingInterest(0);
@@ -161,14 +159,14 @@ contract AlphaHomo is GenericLenderBase {
     function withdrawAll() external override management returns (bool) {
         uint256 invested = _nav();
         Bank b = Bank(bank);
-     
+
         uint256 balance = b.balanceOf(address(this));
-       
+
         b.withdraw(balance);
-      
+
         uint256 withdrawn = address(this).balance;
         IWETH(weth).deposit{value: withdrawn}();
-        uint256 returned =want.balanceOf(address(this));
+        uint256 returned = want.balanceOf(address(this));
         want.safeTransfer(address(strategy), returned);
 
         return returned.add(dust) >= invested;
