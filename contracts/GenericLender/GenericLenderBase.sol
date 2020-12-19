@@ -1,12 +1,12 @@
 pragma solidity 0.6.12;
 
-import { VaultAPI } from "@yearnvaults/contracts/BaseStrategy.sol";
+import {VaultAPI} from "@yearnvaults/contracts/BaseStrategy.sol";
 import "@openzeppelinV3/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelinV3/contracts/math/SafeMath.sol";
 
 import "./IGenericLender.sol";
 
-interface IBaseStrategy{
+interface IBaseStrategy {
     function apiVersion() external pure returns (string memory);
 
     function name() external pure returns (string memory);
@@ -22,7 +22,7 @@ interface IBaseStrategy{
     function harvestTrigger(uint256 callCost) external view returns (bool);
 
     function harvest() external;
-    
+
     function strategist() external view returns (address);
 }
 
@@ -44,11 +44,11 @@ abstract contract GenericLenderBase is IGenericLender {
         want.approve(_strategy, uint256(-1));
     }
 
-    function setDust(uint256 _dust) external override virtual management {
+    function setDust(uint256 _dust) external virtual override management {
         dust = _dust;
     }
 
-    function sweep(address _token) external override virtual management {
+    function sweep(address _token) external virtual override management {
         address[] memory _protectedTokens = protectedTokens();
         for (uint256 i; i < _protectedTokens.length; i++) require(_token != _protectedTokens[i], "!protected");
 
@@ -59,7 +59,10 @@ abstract contract GenericLenderBase is IGenericLender {
 
     //make sure to use
     modifier management() {
-        require(msg.sender == address(strategy) || msg.sender == vault.governance() || msg.sender == IBaseStrategy(strategy).strategist(), "!management");
+        require(
+            msg.sender == address(strategy) || msg.sender == vault.governance() || msg.sender == IBaseStrategy(strategy).strategist(),
+            "!management"
+        );
         _;
     }
 }

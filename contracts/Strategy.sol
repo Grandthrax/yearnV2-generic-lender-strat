@@ -13,11 +13,8 @@ import "@openzeppelinV3/contracts/math/Math.sol";
 import "@openzeppelinV3/contracts/utils/Address.sol";
 import "@openzeppelinV3/contracts/token/ERC20/SafeERC20.sol";
 
-interface IUni{
-    function getAmountsOut(
-        uint256 amountIn, 
-        address[] calldata path
-    ) external view returns (uint256[] memory amounts);
+interface IUni {
+    function getAmountsOut(uint256 amountIn, address[] calldata path) external view returns (uint256[] memory amounts);
 }
 
 /********************
@@ -45,14 +42,13 @@ contract Strategy is BaseStrategy {
     address public wantToEthOracle;
 
     constructor(address _vault) public BaseStrategy(_vault) {
-
         debtThreshold = 1000;
 
         //we do this horrible thing because you can't compare strings in solidity
         require(keccak256(bytes(apiVersion())) == keccak256(bytes(VaultAPI(_vault).apiVersion())), "WRONG VERSION");
     }
 
-    function setPriceOracle(address _oracle) external onlyAuthorized{
+    function setPriceOracle(address _oracle) external onlyAuthorized {
         wantToEthOracle = _oracle;
     }
 
@@ -94,7 +90,7 @@ contract Strategy is BaseStrategy {
 
                 //put the last index here
                 //remove last index
-                if (i != lenders.length-1) {
+                if (i != lenders.length - 1) {
                     lenders[i] = lenders[lenders.length - 1];
                 }
 
@@ -145,7 +141,6 @@ contract Strategy is BaseStrategy {
     function numLenders() public view returns (uint256) {
         return lenders.length;
     }
-
 
     //the weighted apr of all lenders. sum(nav * apr)/totalNav
     function estimatedAPR() public view returns (uint256) {
@@ -329,7 +324,6 @@ contract Strategy is BaseStrategy {
         uint256 debt = vault.strategies(address(this)).totalDebt;
 
         if (total > debt) {
-
             _profit = total - debt;
             uint256 amountToFree = _profit.add(_debtPayment);
 
@@ -351,7 +345,6 @@ contract Strategy is BaseStrategy {
                 }
             }
         } else {
-
             //serious loss should never happen but if it does lets record it accurately
             _loss = debt - total;
             uint256 amountToFree = _loss.add(_debtPayment);
@@ -383,8 +376,8 @@ contract Strategy is BaseStrategy {
      */
     function adjustPosition(uint256 _debtOutstanding) internal override {
         //we just keep all money in want if we dont have any lenders
-        if(lenders.length == 0){
-           return;
+        if (lenders.length == 0) {
+            return;
         }
 
         _debtOutstanding; //ignored. we handle it in prepare return
@@ -466,19 +459,26 @@ contract Strategy is BaseStrategy {
                 }
             }
             if (!lenders[lowest].hasAssets()) {
-
                 return amountWithdrawn;
             }
             amountWithdrawn += lenders[lowest].withdraw(_amount - amountWithdrawn);
             j++;
             //dont want infinite loop
-            if(j >= 6){
+            if (j >= 6) {
                 return amountWithdrawn;
             }
         }
     }
 
-    function exitPosition(uint256 _debtOutstanding) internal override returns ( uint256 _profit, uint256 _loss, uint256 _debtPayment) {
+    function exitPosition(uint256 _debtOutstanding)
+        internal
+        override
+        returns (
+            uint256 _profit,
+            uint256 _loss,
+            uint256 _debtPayment
+        )
+    {
         return prepareReturn(_debtOutstanding);
     }
 
@@ -497,42 +497,40 @@ contract Strategy is BaseStrategy {
             if (received >= _amountNeeded) {
                 return _amountNeeded;
             } else {
-               
                 return received;
             }
         }
     }
 
-    function harvestTrigger(uint256 callCost) public override view returns (bool) {
+    function harvestTrigger(uint256 callCost) public view override returns (bool) {
         uint256 wantCallCost = _callCostToWant(callCost);
 
         return super.harvestTrigger(wantCallCost);
     }
 
-    function ethToWant(uint256 _amount) internal view returns (uint256){
-       
+    function ethToWant(uint256 _amount) internal view returns (uint256) {
         address[] memory path = new address[](2);
         path = new address[](2);
         path[0] = weth;
-        path[1] = address(want); 
- 
+        path[1] = address(want);
+
         uint256[] memory amounts = IUni(uniswapRouter).getAmountsOut(_amount, path);
 
         return amounts[amounts.length - 1];
     }
 
-    function _callCostToWant(uint256 callCost) internal view returns (uint256){
+    function _callCostToWant(uint256 callCost) internal view returns (uint256) {
         uint256 wantCallCost;
 
         //three situations
         //1 currency is eth so no change.
         //2 we use uniswap swap price
         //3 we use external oracle
-        if(address(want) == weth){
+        if (address(want) == weth) {
             wantCallCost = callCost;
-        }else if(wantToEthOracle == address(0)){
+        } else if (wantToEthOracle == address(0)) {
             wantCallCost = ethToWant(callCost);
-        }else{
+        } else {
             wantCallCost = IWantToEth(wantToEthOracle).ethToWant(callCost);
         }
 
@@ -567,17 +565,15 @@ contract Strategy is BaseStrategy {
      */
     function prepareMigration(address _newStrategy) internal override {
         uint256 outstanding = vault.strategies(address(this)).totalDebt;
-        (,uint loss, uint wantBalance) = prepareReturn(outstanding);
+        (, uint256 loss, uint256 wantBalance) = prepareReturn(outstanding);
 
         require(wantBalance.add(loss) >= outstanding, "LIQUIDITY LOCKED");
         want.safeTransfer(_newStrategy, want.balanceOf(address(this)));
     }
-
 
     function protectedTokens() internal view override returns (address[] memory) {
         address[] memory protected = new address[](1);
         protected[0] = address(want);
         return protected;
     }
-
 }
