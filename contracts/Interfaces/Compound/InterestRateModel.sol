@@ -12,7 +12,7 @@ interface InterestRateModel {
         uint256 cash,
         uint256 borrows,
         uint256 reserves
-    ) external view returns (uint256, uint256);
+    ) external view returns (uint256);
 
     /**
      * @notice Calculates the current supply interest rate per block
