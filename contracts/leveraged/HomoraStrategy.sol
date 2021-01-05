@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.6.12;
+pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
 import "@openzeppelinV3/contracts/token/ERC20/IERC20.sol";
@@ -13,9 +13,9 @@ import "../Interfaces/alpha-homora/Bank.sol";
 import "../Interfaces/alpha-homora/BankConfig.sol";
 import "../Interfaces/UniswapInterfaces/IWETH.sol";
 
-import "./LeveragedStrategy.sol";
+import "./ILeveragedStrategy.sol";
 
-contract Homo is LeveragedStrategy {
+contract HomoraStrategy is ILeveragedStrategy {
     using SafeERC20 for IERC20;
     using Address for address;
     using SafeMath for uint256;
@@ -37,7 +37,7 @@ contract Homo is LeveragedStrategy {
     }
 
     function name() external pure override returns (string memory) {
-        return "HomoBasic";
+        return "HomoraStrategy";
     }
 
     function estimatedTotalAssets() public view override returns (uint256) {
@@ -148,6 +148,11 @@ contract Homo is LeveragedStrategy {
             return;
         }
 
+        // More debt than available, nothing to invest
+        if (_debtOutstanding > wethBalance) {
+            return;
+        }
+
         uint256 toInvest = wethBalance.sub(_debtOutstanding);
         IWETH(weth).withdraw(toInvest);
         Bank(bank).deposit{value: toInvest}();
@@ -168,17 +173,6 @@ contract Homo is LeveragedStrategy {
         IWETH(weth).deposit{value: withdrawn}();
 
         return withdrawn;
-    }
-
-    function prepareMigration(address _newStrategy) external override only(leverager) {
-        Bank(bank).transfer(_newStrategy, Bank(bank).balanceOf(address(this)));
-        want.safeTransfer(_newStrategy, want.balanceOf(address(this)));
-    }
-
-    function protectedTokens() external view override returns (address[] memory) {
-        address[] memory protected = new address[](1);
-        protected[0] = address(want);
-        return protected;
     }
 
     receive() external payable {}

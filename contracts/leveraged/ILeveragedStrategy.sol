@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.6.12;
 
-interface LeveragedStrategy {
+interface ILeveragedStrategy {
     function name() external pure returns (string memory);
 
     function apr() external view returns (uint256);
@@ -19,8 +19,4 @@ interface LeveragedStrategy {
     function adjustPosition(uint256) external;
 
     function liquidatePosition(uint256) external returns (uint256 _amountFreed);
-
-    function prepareMigration(address) external;
-
-    function protectedTokens() external view returns (address[] memory);
 }

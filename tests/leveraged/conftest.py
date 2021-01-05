@@ -27,13 +27,13 @@ def leverager(gov, vault, comp, compAdmin, LeveragedEthStrategy):
     leverager = gov.deploy(LeveragedEthStrategy, vault)
     # Ask for around 100 eth credit is in USD
     comp._setCreditLimit(leverager, 600 * Wei("100 ether"), {"from": compAdmin})
-    vault.addStrategy(leverager, 2 ** 256 - 1, 0, 0, {"from": gov})
+    vault.addStrategy(leverager, Wei("200 ether"), 0, 0, {"from": gov})
     yield leverager
 
 
 @pytest.fixture
-def strategy(leverager, gov, Homo):
-    strategy = gov.deploy(Homo, leverager)
+def strategy(leverager, gov, HomoraStrategy):
+    strategy = gov.deploy(HomoraStrategy, leverager)
     leverager.setInnerStrategy(strategy, {"from": gov})
     yield strategy
 
