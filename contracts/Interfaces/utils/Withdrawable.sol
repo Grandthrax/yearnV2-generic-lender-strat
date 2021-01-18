@@ -1,8 +1,9 @@
-pragma solidity ^0.6.6;
+// SPDX-License-Identifier: GPL-3.0
+pragma solidity 0.6.12;
 
-import "@openzeppelinV3/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelinV3/contracts/token/ERC20/SafeERC20.sol";
-import "@openzeppelinV3/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
     Ensures that any contract that inherits from this contract is able to

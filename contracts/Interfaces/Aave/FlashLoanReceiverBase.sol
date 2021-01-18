@@ -1,8 +1,9 @@
-pragma solidity ^0.6.6;
+// SPDX-License-Identifier: GPL-3.0
+pragma solidity 0.6.12;
 
-import "@openzeppelinV3/contracts/math/SafeMath.sol";
-import "@openzeppelinV3/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelinV3/contracts/token/ERC20/SafeERC20.sol";
+import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "./IFlashLoanReceiver.sol";
 import "./ILendingPoolAddressesProvider.sol";
 import "../utils/Withdrawable.sol";

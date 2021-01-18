@@ -1,5 +1,7 @@
-pragma solidity >=0.5.7;
-import "@openzeppelinV3/contracts/math/SafeMath.sol";
+// SPDX-License-Identifier: GPL-3.0
+pragma solidity 0.6.12;
+
+import "@openzeppelin/contracts/math/SafeMath.sol";
 import "./ISoloMargin.sol";
 
 contract DydxFlashloanBase {
