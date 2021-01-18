@@ -7,3 +7,4 @@ reports/
 node_modules/
 @openzeppelinV3/
 .DS_Store
+.nvmrc

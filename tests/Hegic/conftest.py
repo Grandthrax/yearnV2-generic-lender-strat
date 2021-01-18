@@ -117,9 +117,6 @@ def crComptroller(interface):
     yield interface.ComptrollerI("0x3d5BC3c8d13dcB8bF317092d84783c2697AE9258")
 
 
-# @pytest.fixture(autouse=True)
-# def isolation(fn_isolation):
-#    pass
 @pytest.fixture(scope="module", autouse=True)
 def shared_setup(module_isolation):
     pass
@@ -128,13 +125,9 @@ def shared_setup(module_isolation):
 @pytest.fixture
 def vault(gov, rewards, guardian, currency, pm):
     Vault = pm(config["dependencies"][0]).Vault
-    vault = guardian.deploy(Vault, currency, gov, rewards, "", "")
+    vault = Vault.deploy({"from": guardian})
+    vault.initialize(currency, gov, rewards, "", "")
     yield vault
-
-
-@pytest.fixture
-def Vault(pm):
-    yield pm(config["dependencies"][0]).Vault
 
 
 @pytest.fixture
