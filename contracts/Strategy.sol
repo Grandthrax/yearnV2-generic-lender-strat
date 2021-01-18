@@ -42,7 +42,7 @@ contract Strategy is BaseStrategy {
     address public wantToEthOracle;
 
     constructor(address _vault) public BaseStrategy(_vault) {
-        debtThreshold = 1000;
+        debtThreshold = 1e16;
 
         //we do this horrible thing because you can't compare strings in solidity
         require(keccak256(bytes(apiVersion())) == keccak256(bytes(VaultAPI(_vault).apiVersion())), "WRONG VERSION");
