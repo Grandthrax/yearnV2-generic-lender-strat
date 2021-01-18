@@ -36,16 +36,12 @@ def currency(dai, usdc, weth):
 
 @pytest.fixture
 def whale(accounts, web3, weth, gov, chain):
-    # big binance7 wallet
-    # acc = accounts.at('0xBE0eB53F46cd790Cd13851d5EFf43D12404d33E8', force=True)
-    # big binance8 wallet
     acc = accounts.at("0xf977814e90da44bfa03b6295a0616a897441acec", force=True)
 
     # lots of weth account
-    wethAcc = accounts.at("0x767Ecb395def19Ab8d1b2FCc89B3DDfBeD28fD6b", force=True)
+    wethAcc = accounts.at("0x56178a0d5f301baf6cf3e1cd53d9863437345bf9", force=True)
 
     weth.transfer(acc, weth.balanceOf(wethAcc), {"from": wethAcc})
-
     weth.transfer(gov, Wei("100 ether"), {"from": acc})
 
     assert weth.balanceOf(acc) > 0
@@ -127,36 +123,29 @@ def isolation(fn_isolation):
     pass
 
 
-# @pytest.fixture(scope="module", autouse=True)
-# def shared_setup(module_isolation):
-#    pass
-
-
 @pytest.fixture
 def vault(gov, rewards, guardian, currency, pm):
     Vault = pm(config["dependencies"][0]).Vault
-    vault = guardian.deploy(Vault, currency, gov, rewards, "", "")
+    vault = Vault.deploy({"from": guardian})
+    vault.initialize(currency, gov, rewards, "", "")
     yield vault
 
 
 @pytest.fixture
-def Vault(pm):
-    yield pm(config["dependencies"][0]).Vault
-
-
-@pytest.fixture
-def strategy(strategist, keeper, vault, EthCream, AlphaHomo, Strategy, EthCompound):
+def strategy(
+    strategist, gov, keeper, vault, EthCream, AlphaHomo, Strategy, EthCompound
+):
     strategy = strategist.deploy(Strategy, vault)
     strategy.setKeeper(keeper)
 
     ethCreamPlugin = strategist.deploy(EthCream, strategy, "Cream")
-    strategy.addLender(ethCreamPlugin, {"from": strategist})
+    strategy.addLender(ethCreamPlugin, {"from": gov})
 
     alphaHomoPlugin = strategist.deploy(AlphaHomo, strategy, "Alpha Homo")
-    strategy.addLender(alphaHomoPlugin, {"from": strategist})
+    strategy.addLender(alphaHomoPlugin, {"from": gov})
 
     compoundPlugin = strategist.deploy(EthCompound, strategy, "Compound")
-    strategy.addLender(compoundPlugin, {"from": strategist})
+    strategy.addLender(compoundPlugin, {"from": gov})
 
     yield strategy
 

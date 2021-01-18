@@ -38,7 +38,6 @@ def test_normal_hegic(
     assert strategy.estimatedTotalAssets() == 0
     chain.mine(1)
 
-
     assert strategy.harvestTrigger(1) == True
 
     strategy.harvest({"from": strategist})
@@ -62,7 +61,6 @@ def test_normal_hegic(
         chain.sleep(15 * 30)
         chain.mine(waitBlock)
 
-
         strategy.harvest({"from": strategist})
         something = True
         action = random.randint(0, 9)
@@ -72,7 +70,7 @@ def test_normal_hegic(
             shareprice = vault.pricePerShare()
 
             shares = vault.balanceOf(whale)
-            print("whale has:", shares/1e18)
+            print("whale has:", shares / 1e18)
             sharesout = shares * percent / 100
             expectedout = (sharesout * shareprice) / (10 ** (decimals))
             balanceBefore = currency.balanceOf(whale)
@@ -105,8 +103,8 @@ def test_normal_hegic(
         )
     vault.withdraw(vault.balanceOf(strategist), {"from": strategist})
     balanceAfter = currency.balanceOf(strategist)
-    print("shares", vault.balanceOf(strategist)/1e18)
-    print(balanceAfter/1e18)
+    print("shares", vault.balanceOf(strategist) / 1e18)
+    print(balanceAfter / 1e18)
     status = strategy.lendStatuses()
 
     chain.mine(waitBlock)
