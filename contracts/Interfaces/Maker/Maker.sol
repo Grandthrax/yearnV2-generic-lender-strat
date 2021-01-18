@@ -1,4 +1,5 @@
-pragma solidity >0.5.17;
+// SPDX-License-Identifier: GPL-3.0
+pragma solidity 0.6.12;
 
 interface GemLike {
     function approve(address, uint256) external;
