@@ -28,7 +28,8 @@ def test_normal_hegic(
     currency.approve(vault, 2 ** 256 - 1, {"from": strategist})
 
     deposit_limit = 1_000_000_000 * (10 ** (decimals))
-    vault.addStrategy(strategy, deposit_limit, deposit_limit, 500, {"from": gov})
+    vault.setDepositLimit(deposit_limit, {"from": gov})
+    vault.addStrategy(strategy, 10_000, 0, 500, {"from": gov})
 
     # our humble strategist deposits some test funds
     depositAmount = 501 * (10 ** (decimals))
@@ -36,6 +37,7 @@ def test_normal_hegic(
 
     assert strategy.estimatedTotalAssets() == 0
     chain.mine(1)
+
     assert strategy.harvestTrigger(1) == True
 
     strategy.harvest({"from": strategist})
@@ -44,6 +46,7 @@ def test_normal_hegic(
         strategy.estimatedTotalAssets() >= depositAmount * 0.999999
     )  # losing some dust is ok
 
+    # this fails
     assert strategy.harvestTrigger(1) == False
 
     # whale deposits as well
@@ -55,8 +58,8 @@ def test_normal_hegic(
     for i in range(15):
         waitBlock = random.randint(10, 50)
         crHegic.mint(0, {"from": whale})
-        chain.mine(waitBlock)
         chain.sleep(15 * 30)
+        chain.mine(waitBlock)
 
         strategy.harvest({"from": strategist})
         something = True
@@ -67,7 +70,7 @@ def test_normal_hegic(
             shareprice = vault.pricePerShare()
 
             shares = vault.balanceOf(whale)
-            print("whale has:", shares)
+            print("whale has:", shares / 1e18)
             sharesout = shares * percent / 100
             expectedout = (sharesout * shareprice) / (10 ** (decimals))
             balanceBefore = currency.balanceOf(whale)
@@ -83,27 +86,25 @@ def test_normal_hegic(
             vault.deposit(depositAm, {"from": whale})
 
     # strategist withdraws
+    genericStateOfStrat(strategy, currency, vault)
+    genericStateOfVault(vault, currency)
     shareprice = vault.pricePerShare()
 
     shares = vault.balanceOf(strategist)
     expectedout = (shares * shareprice) / (10 ** (decimals))
     balanceBefore = currency.balanceOf(strategist)
     print(balanceBefore)
-    # genericStateOfStrat(strategy, currency, vault)
-    # genericStateOfVault(vault, currency)
     status = strategy.lendStatuses()
     form = "{:.2%}"
     formS = "{:,.0f}"
     for j in status:
         print(
-            f"Lender: {j[0]}, Deposits: {formS.format(j[1]/1e6)}, APR: {form.format(j[2]/1e18)}"
+            f"Lender: {j[0]}, Deposits: {formS.format(j[1]/1e18)}, APR: {form.format(j[2]/1e18)}"
         )
     vault.withdraw(vault.balanceOf(strategist), {"from": strategist})
     balanceAfter = currency.balanceOf(strategist)
-    print("shares", vault.balanceOf(strategist))
-    print(balanceAfter)
-    # genericStateOfStrat(strategy, currency, vault)
-    # genericStateOfVault(vault, currency)
+    print("shares", vault.balanceOf(strategist) / 1e18)
+    print(balanceAfter / 1e18)
     status = strategy.lendStatuses()
 
     chain.mine(waitBlock)
@@ -138,7 +139,8 @@ def test_apr_hegic(
 ):
 
     deposit_limit = 1_000_000_000 * 1e18
-    vault.addStrategy(strategy, deposit_limit, deposit_limit, 500, {"from": gov})
+    vault.setDepositLimit(deposit_limit, {"from": gov})
+    vault.addStrategy(strategy, 10_000, 0, 500, {"from": gov})
     hegic.approve(vault, 2 ** 256 - 1, {"from": whale})
 
     whale_deposit = 1_000_000 * 1e18
@@ -169,30 +171,22 @@ def test_apr_hegic(
     for i in range(10):
         crHegic.mint(0, {"from": whale})
         waitBlock = 25
-        # print(f'\n----wait {waitBlock} blocks----')
         chain.mine(waitBlock)
         chain.sleep(waitBlock * 13)
-        # print(f'\n----harvest----')
         strategy.harvest({"from": strategist})
-
-        # genericStateOfStrat(strategy, currency, vault)
-        # genericStateOfVault(vault, currency)
 
         profit = (vault.totalAssets() - startingBalance) / 1e6
         strState = vault.strategies(strategy)
         totalReturns = strState[6]
         totaleth = totalReturns / 1e6
-        # print(f'Real Profit: {profit:.5f}')
         difff = profit - totaleth
-        # print(f'Diff: {difff}')
 
         blocks_per_year = 2_252_857
         assert startingBalance != 0
         time = (i + 1) * waitBlock
         assert time != 0
         apr = (totalReturns / startingBalance) * (blocks_per_year / time)
-        # assert apr > 0 and apr < 1
-        # print(apr)
+
         status = strategy.lendStatuses()
         form = "{:.2%}"
         formS = "{:,.0f}"

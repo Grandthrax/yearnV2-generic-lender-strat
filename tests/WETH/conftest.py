@@ -82,11 +82,6 @@ def currency(dai, usdc, weth):
     yield weth
 
 
-@pytest.fixture(autouse=True)
-def carlos(fn_isolation):
-    pass
-
-
 @pytest.fixture
 def whale(accounts, web3, weth):
     # big binance7 wallet
@@ -183,9 +178,6 @@ def crUsdc(interface):
     yield interface.CErc20I("0x44fbeBd2F576670a6C33f6Fc0B00aA8c5753b322")
 
 
-# @pytest.fixture(autouse=True)
-# def isolation(fn_isolation):
-#    pass
 @pytest.fixture(scope="module", autouse=True)
 def shared_setup(module_isolation):
     pass
@@ -194,13 +186,9 @@ def shared_setup(module_isolation):
 @pytest.fixture
 def vault(gov, rewards, guardian, currency, pm):
     Vault = pm(config["dependencies"][0]).Vault
-    vault = guardian.deploy(Vault, currency, gov, rewards, "", "")
+    vault = Vault.deploy({"from": guardian})
+    vault.initialize(currency, gov, rewards, "", "")
     yield vault
-
-
-@pytest.fixture
-def Vault(pm):
-    yield pm(config["dependencies"][0]).Vault
 
 
 @pytest.fixture
