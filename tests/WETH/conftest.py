@@ -90,7 +90,7 @@ def whale(accounts, web3, weth):
     acc = accounts.at("0xf977814e90da44bfa03b6295a0616a897441acec", force=True)
 
     # lots of weth account
-    wethAcc = accounts.at("0x1840c62fD7e2396e470377e6B2a833F3A1E96221", force=True)
+    wethAcc = accounts.at("0x1E0447b19BB6EcFdAe1e4AE1694b0C3659614e4e", force=True)
     weth.approve(acc, 2 ** 256 - 1, {"from": wethAcc})
     weth.transfer(acc, weth.balanceOf(wethAcc), {"from": wethAcc})
 

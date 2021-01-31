@@ -95,6 +95,7 @@ def test_vault_shares_generic(
     vault.setDepositLimit(deposit_limit, {"from": gov})
 
     vault.addStrategy(strategy, 10_000, 0, 0, {"from": gov})
+    print(currency)
 
     assert vault.totalSupply() == 0
     amount1 = Wei("50 ether")
@@ -110,6 +111,9 @@ def test_vault_shares_generic(
     assert vault.pricePerShare() * whale_share / 1e18 == vault.totalAssets() / 2
     assert gov_share == whale_share
 
+    strategy.harvest({"from": gov})
+    chain.mine(2)
+    chain.sleep(2)
     strategy.harvest({"from": gov})
     # no profit yet
     whale_share = vault.balanceOf(whale)

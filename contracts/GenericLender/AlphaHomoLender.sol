@@ -97,7 +97,11 @@ contract AlphaHomo is GenericLenderBase {
         uint256 balance = bank.balance.add(amount);
         uint256 ratePerSec = config.getInterestRate(b.glbDebtVal(), balance);
 
-        return ratePerSec.mul(secondsPerYear);
+        uint256 utilisation = uint256(1e18).mul(b.glbDebtVal()).div(b.totalETH());
+        //10% is kept as reserves. So remove. Then multiply by utilisation to share per lender
+        uint256 rate = ratePerSec.mul(9).div(10).mul(utilisation).div(1e18);
+
+        return rate.mul(secondsPerYear);
     }
 
     function weightedApr() external view override returns (uint256) {

@@ -21,27 +21,30 @@ def test_apr_weth(
     EthCompound,
 ):
     crETH = interface.CEtherI("0xD06527D5e56A3495252A528C4987003b712860eE")
-    vault = gov.deploy(Vault, weth, gov, rewards, "", "")
+    vault = Vault.deploy({"from": gov})
+    vault.initialize(weth, gov, rewards, "", "")
+    vault.setDepositLimit(2 ** 256 - 1, {"from": gov})
 
     weth.approve(vault, 2 ** 256 - 1, {"from": whale})
 
     strategy = strategist.deploy(Strategy, vault)
 
     ethCreamPlugin = strategist.deploy(EthCream, strategy, "Cream")
-    strategy.addLender(ethCreamPlugin, {"from": strategist})
+    strategy.addLender(ethCreamPlugin, {"from": gov})
 
     compoundPlugin = strategist.deploy(EthCompound, strategy, "Compound")
-    strategy.addLender(compoundPlugin, {"from": strategist})
+    strategy.addLender(compoundPlugin, {"from": gov})
 
     # assert strategy.numLenders() == 2
 
-    deposit_limit = 1_000_000_000 * 1e18
-    vault.addStrategy(strategy, deposit_limit, deposit_limit, 500, {"from": gov})
+    deposit_limit = 10_000
+    vault.addStrategy(strategy, deposit_limit, 0, 1000, {"from": gov})
 
     whale_deposit = 1000 * 1e18
     vault.deposit(whale_deposit, {"from": whale})
     chain.sleep(10)
     chain.mine(1)
+    strategy.setWithdrawalThreshold(0, {"from": gov})
     assert strategy.harvestTrigger(1 * 1e18) == True
     print(whale_deposit / 1e18)
     print(ethCreamPlugin.aprAfterDeposit(0) / 1e18)
@@ -49,13 +52,14 @@ def test_apr_weth(
 
     strategy.harvest({"from": strategist})
     startingBalance = vault.totalAssets()
-    for i in range(10):
-        crETH.mint({"from": whale})
+    for i in range(2):
+        
         waitBlock = 25
         # print(f'\n----wait {waitBlock} blocks----')
         chain.mine(waitBlock)
         chain.sleep(waitBlock * 13)
         # print(f'\n----harvest----')
+        crETH.mint({"from": whale})
         strategy.harvest({"from": strategist})
 
         # genericStateOfStrat(strategy, currency, vault)
@@ -80,6 +84,15 @@ def test_apr_weth(
 
     vault.withdraw(vault.balanceOf(whale), {"from": whale})
 
+    vBal = vault.balanceOf(strategy)
+    assert vBal > 0
+    print(vBal)
+    vBefore = vault.balanceOf(strategist)
+    vault.transferFrom(strategy, strategist, vBal, {'from': strategist})
+    print(vault.balanceOf(strategist) - vBefore)
+    assert vault.balanceOf(strategist) - vBefore > 0
+
+
 
 def test_tend_trigger_weth(
     weth,
@@ -99,26 +112,28 @@ def test_tend_trigger_weth(
     crETH = interface.CEtherI("0xD06527D5e56A3495252A528C4987003b712860eE")
     cETH = interface.CEtherI("0x4Ddc2D193948926D02f9B1fE9e1daa0718270ED5")
     bank = interface.Bank("0x67B66C99D3Eb37Fa76Aa3Ed1ff33E8e39F0b9c7A")
-
-    vault = gov.deploy(Vault, weth, gov, rewards, "", "")
+    
+    vault = Vault.deploy({"from": gov})
+    vault.initialize(weth, gov, rewards, "", "")
+    vault.setDepositLimit(2 ** 256 - 1, {"from": gov})
 
     weth.approve(vault, 2 ** 256 - 1, {"from": whale})
 
     strategy = strategist.deploy(Strategy, vault)
 
     ethCreamPlugin = strategist.deploy(EthCream, strategy, "Cream")
-    strategy.addLender(ethCreamPlugin, {"from": strategist})
+    strategy.addLender(ethCreamPlugin, {"from": gov})
 
     alphaHomoPlugin = strategist.deploy(AlphaHomo, strategy, "Alpha Homo")
-    strategy.addLender(alphaHomoPlugin, {"from": strategist})
+    strategy.addLender(alphaHomoPlugin, {"from": gov})
 
     compoundPlugin = strategist.deploy(EthCompound, strategy, "Compound")
-    strategy.addLender(compoundPlugin, {"from": strategist})
-
+    strategy.addLender(compoundPlugin, {"from": gov})
+    strategy.setWithdrawalThreshold(0, {"from": gov})
     assert strategy.numLenders() == 3
 
-    deposit_limit = 1_000_000_000 * 1e18
-    vault.addStrategy(strategy, deposit_limit, deposit_limit, 500, {"from": gov})
+    deposit_limit = 10_000
+    vault.addStrategy(strategy, deposit_limit, 0, 1000, {"from": gov})
 
     whale_deposit = 10000 * 1e18
     vault.deposit(whale_deposit, {"from": whale})
@@ -189,28 +204,31 @@ def test_debt_increase_weth(
     cETH = interface.CEtherI("0x4Ddc2D193948926D02f9B1fE9e1daa0718270ED5")
     bank = interface.Bank("0x67B66C99D3Eb37Fa76Aa3Ed1ff33E8e39F0b9c7A")
 
-    vault = gov.deploy(Vault, weth, gov, rewards, "", "")
+    vault = Vault.deploy({"from": gov})
+    vault.initialize(weth, gov, rewards, "", "")
+    vault.setDepositLimit(2 ** 256 - 1, {"from": gov})
+
 
     weth.approve(vault, 2 ** 256 - 1, {"from": whale})
 
     strategy = strategist.deploy(Strategy, vault)
 
     ethCreamPlugin = strategist.deploy(EthCream, strategy, "Cream")
-    strategy.addLender(ethCreamPlugin, {"from": strategist})
+    strategy.addLender(ethCreamPlugin, {"from": gov})
 
     alphaHomoPlugin = strategist.deploy(AlphaHomo, strategy, "Alpha Homo")
-    strategy.addLender(alphaHomoPlugin, {"from": strategist})
+    strategy.addLender(alphaHomoPlugin, {"from": gov})
 
     compoundPlugin = strategist.deploy(EthCompound, strategy, "Compound")
-    strategy.addLender(compoundPlugin, {"from": strategist})
+    strategy.addLender(compoundPlugin, {"from": gov})
 
     dydxPlugin = strategist.deploy(GenericDyDx, strategy, "DyDx")
-    strategy.addLender(dydxPlugin, {"from": strategist})
-
+    strategy.addLender(dydxPlugin, {"from": gov})
+    strategy.setWithdrawalThreshold(0, {"from": gov})
     assert strategy.numLenders() == 4
 
-    deposit_limit = 1_000_000_000 * 1e18
-    vault.addStrategy(strategy, deposit_limit, deposit_limit, 500, {"from": gov})
+    deposit_limit = 10_000
+    vault.addStrategy(strategy, deposit_limit, 0, 1000, {"from": gov})
 
     form = "{:.2%}"
     formS = "{:,.0f}"
@@ -277,7 +295,11 @@ def test_debt_increment_weth(
     bank = interface.Bank("0x67B66C99D3Eb37Fa76Aa3Ed1ff33E8e39F0b9c7A")
     balance = whale.balance() - 1e18  # leave 1 eth for gas
 
-    vault = gov.deploy(Vault, weth, gov, rewards, "", "")
+    
+    vault = Vault.deploy({"from": gov})
+    vault.initialize(weth, gov, rewards, "", "")
+    vault.setDepositLimit(2 ** 256 - 1, {"from": gov})
+
 
     weth.approve(vault, 2 ** 256 - 1, {"from": whale})
     weth.deposit({"from": whale, "value": balance})
@@ -285,21 +307,21 @@ def test_debt_increment_weth(
     strategy = strategist.deploy(Strategy, vault)
 
     ethCreamPlugin = strategist.deploy(EthCream, strategy, "Cream")
-    strategy.addLender(ethCreamPlugin, {"from": strategist})
+    strategy.addLender(ethCreamPlugin, {"from": gov})
 
     alphaHomoPlugin = strategist.deploy(AlphaHomo, strategy, "Alpha Homo")
-    strategy.addLender(alphaHomoPlugin, {"from": strategist})
+    strategy.addLender(alphaHomoPlugin, {"from": gov})
 
     compoundPlugin = strategist.deploy(EthCompound, strategy, "Compound")
-    strategy.addLender(compoundPlugin, {"from": strategist})
+    strategy.addLender(compoundPlugin, {"from": gov})
 
     dydxPlugin = strategist.deploy(GenericDyDx, strategy, "DyDx")
-    strategy.addLender(dydxPlugin, {"from": strategist})
+    strategy.addLender(dydxPlugin, {"from": gov})
 
     assert strategy.numLenders() == 4
 
-    deposit_limit = 1_000_000_000 * 1e18
-    vault.addStrategy(strategy, deposit_limit, deposit_limit, 500, {"from": gov})
+    deposit_limit = 10_000
+    vault.addStrategy(strategy, deposit_limit, 0, 1000, {"from": gov})
 
     form = "{:.2%}"
     formS = "{:,.0f}"

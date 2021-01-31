@@ -21,7 +21,7 @@ interface IUni {
  *
  *   A lender optimisation strategy for any erc20 asset
  *   https://github.com/Grandthrax/yearnV2-generic-lender-strat
- *   v0.2.2
+ *   v0.3.1
  *
  *   This strategy works by taking plugins designed for standard lending platforms
  *   It automatically chooses the best yield generating platform and adjusts accordingly
@@ -36,18 +36,23 @@ contract Strategy is BaseStrategy {
 
     address public constant uniswapRouter = address(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
     address public constant weth = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+    uint256 public withdrawalThreshold  = 1e16;
 
     IGenericLender[] public lenders;
     bool public externalOracle = false;
     address public wantToEthOracle;
 
     constructor(address _vault) public BaseStrategy(_vault) {
-        debtThreshold = 1e16;
+        debtThreshold = 100*1e18;
 
         //we do this horrible thing because you can't compare strings in solidity
         require(keccak256(bytes(apiVersion())) == keccak256(bytes(VaultAPI(_vault).apiVersion())), "WRONG VERSION");
     }
 
+    function setWithdrawalThreshold(uint256 _threshold) external onlyAuthorized {
+        withdrawalThreshold = _threshold;
+    }
+    
     function setPriceOracle(address _oracle) external onlyAuthorized {
         wantToEthOracle = _oracle;
     }
@@ -375,14 +380,15 @@ contract Strategy is BaseStrategy {
      *   we ignore debt outstanding for an easy life
      */
     function adjustPosition(uint256 _debtOutstanding) internal override {
-        //we just keep all money in want if we dont have any lenders
-        if (lenders.length == 0) {
-            return;
-        }
 
         _debtOutstanding; //ignored. we handle it in prepare return
         //emergency exit is dealt with at beginning of harvest
         if (emergencyExit) {
+            return;
+        }
+
+        //we just keep all money in want if we dont have any lenders
+        if (lenders.length == 0) {
             return;
         }
 
@@ -439,7 +445,7 @@ contract Strategy is BaseStrategy {
     //cycle through withdrawing from worst rate first
     function _withdrawSome(uint256 _amount) internal returns (uint256 amountWithdrawn) {
         //dont withdraw dust
-        if (_amount < debtThreshold) {
+        if (_amount < withdrawalThreshold) {
             return 0;
         }
 
@@ -490,7 +496,7 @@ contract Strategy is BaseStrategy {
         }
     }
 
-    function harvestTrigger(uint256 callCost) public view override returns (bool) {
+    function harvestTrigger(uint256 callCost) public override view returns (bool) {
         uint256 wantCallCost = _callCostToWant(callCost);
 
         return super.harvestTrigger(wantCallCost);
@@ -554,9 +560,6 @@ contract Strategy is BaseStrategy {
     function prepareMigration(address _newStrategy) internal override {
         uint256 outstanding = vault.strategies(address(this)).totalDebt;
         (, uint256 loss, uint256 wantBalance) = prepareReturn(outstanding);
-
-        require(wantBalance.add(loss) >= outstanding, "LIQUIDITY LOCKED");
-        want.safeTransfer(_newStrategy, want.balanceOf(address(this)));
     }
 
     function protectedTokens() internal view override returns (address[] memory) {

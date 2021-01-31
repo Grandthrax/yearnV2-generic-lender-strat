@@ -5,6 +5,6 @@ build/
 reports/
 @yearnvaults/
 node_modules/
-@openzeppelinV3/
+@openzeppelin/
 .DS_Store
 .nvmrc
