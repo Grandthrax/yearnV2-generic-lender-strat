@@ -319,6 +319,9 @@ contract Strategy is BaseStrategyInitializable {
         }
         return nav;
     }
+    
+    event Juan(uint profit, uint total, uint debt, uint debtPayment);
+    event WithdrawSome_(uint looseBalance);
 
     //we need to free up profit plus _debtOutstanding.
     //If _debtOutstanding is more than we can free we get as much as possible
@@ -356,14 +359,17 @@ contract Strategy is BaseStrategyInitializable {
 
         if (total > debt) {
             _profit = total - debt;
-            uint256 amountToFree = _profit.add(_debtPayment);
 
+            uint256 amountToFree = _profit.add(_debtPayment);
+            emit Juan(_profit, total, debt, _debtPayment);
             //we need to add outstanding to our profit
             //dont need to do logic if there is nothiing to free
             if (amountToFree > 0 && looseAssets < amountToFree) {
                 //withdraw what we can withdraw
+                emit WithdrawSome_(want.balanceOf(address(this)));
                 _withdrawSome(amountToFree.sub(looseAssets));
                 uint256 newLoose = want.balanceOf(address(this));
+                emit WithdrawSome_(newLoose);
 
                 //if we dont have enough money adjust _debtOutstanding and only change profit if needed
                 if (newLoose < amountToFree) {

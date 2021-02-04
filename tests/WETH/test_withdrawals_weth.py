@@ -26,14 +26,16 @@ def test_withdrawals_weth_work(
     currency.approve(vault, 2 ** 256 - 1, {"from": strategist})
 
     deposit_limit = 1_000_000_000 * (10 ** (decimals))
-    vault.addStrategy(strategy, deposit_limit, 0, 2 ** 256 - 1, 500, {"from": gov})
-
+    debt_ratio = 10_000
+    vault.addStrategy(strategy, debt_ratio, 0, 2 ** 256 - 1, 500, {"from": gov})
+    vault.setDepositLimit(deposit_limit, {'from': gov})
+    
     status = strategy.lendStatuses()
     depositAmount = 5 * (10 ** (decimals))
     vault.deposit(depositAmount, {"from": strategist})
 
     # whale deposits as well
-    whale_deposit = 1000 * (10 ** (decimals))
+    whale_deposit = 1_000 * (10 ** (decimals))
     vault.deposit(whale_deposit, {"from": whale})
 
     strategy.harvest({"from": strategist})
@@ -43,21 +45,26 @@ def test_withdrawals_weth_work(
     genericStateOfVault(vault, currency)
 
     strategy.harvest({"from": strategist})
+    chain.sleep(6*3600+1)
+    chain.mine(1)
     # genericStateOfStrat(strategy, currency, vault)
     # genericStateOfVault(vault, currency)
     shareprice = vault.pricePerShare()
 
-    shares = vault.balanceOf(gov)
+    shares = vault.balanceOf(whale)
     expectedout = (shares * shareprice) / (10 ** (decimals))
-    balanceBefore = currency.balanceOf(gov)
-    vault.withdraw(vault.balanceOf(gov), {"from": gov})
-    balanceAfter = currency.balanceOf(gov)
+    balanceBefore = currency.balanceOf(whale)
+    vault.withdraw(vault.balanceOf(whale), {"from": whale})
+    balanceAfter = currency.balanceOf(whale)
 
     withdrawn = balanceAfter - balanceBefore
     assert withdrawn > expectedout * 0.99 and withdrawn < expectedout * 1.01
 
     form = "{:.2%}"
     formS = "{:,.0f}"
+    vault.deposit(whale_deposit, {"from": whale})
+    vault.deposit(depositAmount, {"from": strategist})
+    strategy.harvest({"from": strategist})
 
     for j in status:
         print("Removing ", j[0])
@@ -74,7 +81,7 @@ def test_withdrawals_weth_work(
     for j in status:
         plugin = interface.IGeneric(j[3])
         print("Testing ", j[0])
-        strategy.addLender(j[3])
+        strategy.addLender(j[3], {'from': gov})
         strategy.harvest({"from": strategist})
 
         assert plugin.nav() > (depositAmount + whale_deposit) * 0.999

@@ -124,6 +124,9 @@ def cUsdc(interface):
 def crUsdc(interface):
     yield interface.CErc20I("0x44fbeBd2F576670a6C33f6Fc0B00aA8c5753b322")
 
+@pytest.fixture
+def aUsdc(interface):
+    yield interface.CErc20I("0xBcca60bB61934080951369a648Fb03DF4F96263C")
 
 @pytest.fixture(scope="module", autouse=True)
 def shared_setup(module_isolation):
@@ -135,31 +138,44 @@ def vault(gov, rewards, guardian, currency, pm):
     Vault = pm(config["dependencies"][0]).Vault
     vault = Vault.deploy({"from": guardian})
     vault.initialize(currency, gov, rewards, "", "")
+    vault.setManagementFee(0, {'from': gov})
     yield vault
 
 
 @pytest.fixture
 def strategy(
     strategist,
+    gov,
+    rewards,
     keeper,
     vault,
     crUsdc,
     cUsdc,
+    aUsdc,
     Strategy,
     GenericCompound,
     GenericCream,
     GenericDyDx,
+    GenericAave
 ):
     strategy = strategist.deploy(Strategy, vault)
-    strategy.setKeeper(keeper)
+    strategy.setKeeper(keeper, {'from': gov})
+    strategy.setWithdrawalThreshold(0, {'from': gov})
+    strategy.setRewards(rewards, {'from': strategist})
+
+    protocolDataProvider = "0x057835Ad21a177dbdd3090bB1CAE03EaCF78Fc6d"
 
     compoundPlugin = strategist.deploy(GenericCompound, strategy, "Compound", cUsdc)
     creamPlugin = strategist.deploy(GenericCream, strategy, "Cream", crUsdc)
     dydxPlugin = strategist.deploy(GenericDyDx, strategy, "DyDx")
-    strategy.addLender(compoundPlugin, {"from": strategist})
+    aavePlugin = strategist.deploy(GenericAave, strategy, "Aave", protocolDataProvider, aUsdc)
+    
+    strategy.addLender(creamPlugin, {"from": gov})
     assert strategy.numLenders() == 1
-    strategy.addLender(creamPlugin, {"from": strategist})
+    strategy.addLender(compoundPlugin, {"from": gov})
     assert strategy.numLenders() == 2
-    strategy.addLender(dydxPlugin, {"from": strategist})
+    strategy.addLender(dydxPlugin, {"from": gov})
     assert strategy.numLenders() == 3
+    strategy.addLender(aavePlugin, {"from": gov})
+    assert strategy.numLenders() == 4
     yield strategy

@@ -111,10 +111,10 @@ contract EthCompound is GenericLenderBase {
 
             if (toWithdraw <= liquidity) {
                 //we can take all
-                require(crETH.redeemUnderlying(toWithdraw) == 0, "ctoken: redeemUnderlying fail");
+               crETH.redeemUnderlying(toWithdraw);
             } else {
                 //take all we can
-                require(crETH.redeemUnderlying(liquidity) == 0, "ctoken: redeemUnderlying fail");
+                crETH.redeemUnderlying(liquidity);
             }
         }
 
@@ -151,7 +151,7 @@ contract EthCompound is GenericLenderBase {
 
         uint256 balance = crETH.balanceOf(address(this));
 
-        require(crETH.redeem(balance) == 0, "ctoken: redeem fail");
+        crETH.redeem(balance);
 
         uint256 withdrawn = address(this).balance;
         IWETH(weth).deposit{value: withdrawn}();

@@ -5,7 +5,7 @@ import random
 import brownie
 
 
-def test_030_live(
+def xtest_030_live(
     currency,
     interface,
     samdev,
@@ -50,7 +50,7 @@ def test_030_live(
         )
 
 
-def test_live(
+def xtest_live(
     currency,
     interface,
     samdev,
@@ -75,7 +75,7 @@ def test_live(
     addresses = [whale]
     permissions = [True]
     live_guest_list.setGuests(addresses, permissions, {"from": gov})
-    # strategy.addLender(live_dydxweth, {"from": strategist})
+    strategy.addLender(live_dydxweth, {"from": strategist})
 
     genericStateOfStrat(strategy, currency, vault)
     genericStateOfVault(vault, currency)
@@ -99,7 +99,7 @@ def test_live(
         )
 
 
-def test_live2(
+def xtest_live2(
     currency,
     interface,
     samdev,
@@ -119,7 +119,6 @@ def test_live2(
     strategist = samdev
     strategy = live_strat_weth_2
     vault = live_vault_weth_2
-
     addresses = [whale]
     permissions = [True]
 

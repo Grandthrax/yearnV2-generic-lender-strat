@@ -9,12 +9,12 @@ def genericStateOfStrat(strategy, currency, vault):
     print("Want:", currency.balanceOf(strategy) / (1 ** decimals))
     print("Total assets estimate:", strategy.estimatedTotalAssets() / (10 ** decimals))
     strState = vault.strategies(strategy)
-    totalDebt = strState[5] / (10 ** decimals)
-    debtLimit = strState[2] / (10 ** decimals)
+    totalDebt = strState[6] / (10 ** decimals)
+    # debtLimit = strState[2] / (10 ** decimals)
 
-    totalReturns = strState[6] / (10 ** decimals)
+    totalReturns = strState[7] / (10 ** decimals)
     print(f"Total Strategy Debt: {totalDebt:.5f}")
-    print(f"Strategy Debt Limit: {debtLimit:.5f}")
+    # print(f"Strategy Debt Limit: {debtLimit:.5f}")
     print(f"Total Strategy Returns: {totalReturns:.5f}")
     print("Harvest Trigger:", strategy.harvestTrigger(1000000 * 30 * 1e9))
     print(

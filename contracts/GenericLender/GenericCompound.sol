@@ -99,6 +99,7 @@ contract GenericCompound is GenericLenderBase {
             //cant withdraw more than we own
             amount = total;
         }
+        
         if (looseBalance >= amount) {
             want.safeTransfer(address(strategy), amount);
             return amount;

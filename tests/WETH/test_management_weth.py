@@ -12,8 +12,9 @@ def test_manual_override_weth(
     decimals = currency.decimals()
 
     deposit_limit = 100_000_000 * (10 ** decimals)
-    vault.addStrategy(strategy, deposit_limit, 0, 2 ** 256 - 1, 500, {"from": gov})
-
+    debt_ratio = 10_000
+    vault.addStrategy(strategy, debt_ratio, 0, 2 ** 256 - 1, 500, {"from": gov})
+    vault.setDepositLimit(deposit_limit, {'from': gov})
     amount1 = 50 * (10 ** decimals)
     currency.approve(vault, 2 ** 256 - 1, {"from": whale})
     currency.approve(vault, 2 ** 256 - 1, {"from": strategist})

@@ -42,6 +42,9 @@ def live_strat_weth_2(Strategy):
 def live_strat_weth_031(Strategy):
     yield Strategy.at("0xac5DA2Ca938A7328dE563D7d7209370e24BFd21e")
 
+@pytest.fixture
+def live_strat_weth_032(Strategy):
+    yield Strategy.at("0xeE697232DF2226c9fB3F02a57062c4208f287851")
 
 @pytest.fixture
 def live_vault_weth_2(pm):
@@ -60,6 +63,10 @@ def live_vault_weth_031(pm):
     Vault = pm(config["dependencies"][0]).Vault
     yield Vault.at("0xac333895ce1A73875CF7B4Ecdc5A743C12f3d82B")
 
+@pytest.fixture
+def live_vault_weth_032(pm):
+    Vault = pm(config["dependencies"][0]).Vault
+    yield Vault.at("0xa9fE4601811213c340e850ea305481afF02f5b28")
 
 @pytest.fixture
 def live_Alpha_Homo_2(AlphaHomo):
@@ -101,7 +108,7 @@ def whale(accounts, web3, weth):
     acc = accounts.at("0xf977814e90da44bfa03b6295a0616a897441acec", force=True)
 
     # lots of weth account
-    wethAcc = accounts.at("0x1E0447b19BB6EcFdAe1e4AE1694b0C3659614e4e", force=True)
+    wethAcc = accounts.at("0x0092081D8E3E570E9E88F4563444bd4B92684502", force=True)
     weth.approve(acc, 2 ** 256 - 1, {"from": wethAcc})
     weth.transfer(acc, weth.balanceOf(wethAcc), {"from": wethAcc})
 
@@ -188,6 +195,10 @@ def cUsdc(interface):
 def crUsdc(interface):
     yield interface.CErc20I("0x44fbeBd2F576670a6C33f6Fc0B00aA8c5753b322")
 
+@pytest.fixture
+def aUsdc(interface):
+    yield interface.CErc20I("0xBcca60bB61934080951369a648Fb03DF4F96263C")
+
 
 @pytest.fixture(scope="module", autouse=True)
 def shared_setup(module_isolation):
@@ -205,10 +216,9 @@ def vault(gov, rewards, guardian, currency, pm):
 @pytest.fixture
 def strategy(
     strategist,
+    gov,
     keeper,
     vault,
-    crUsdc,
-    cUsdc,
     Strategy,
     EthCream,
     AlphaHomo,
@@ -219,16 +229,19 @@ def strategy(
     strategy.setKeeper(keeper)
 
     ethCreamPlugin = strategist.deploy(EthCream, strategy, "Cream")
-    strategy.addLender(ethCreamPlugin, {"from": strategist})
+    strategy.addLender(ethCreamPlugin, {"from": gov})
 
     alphaHomoPlugin = strategist.deploy(AlphaHomo, strategy, "Alpha Homo")
-    strategy.addLender(alphaHomoPlugin, {"from": strategist})
+    strategy.addLender(alphaHomoPlugin, {"from": gov})
 
     compoundPlugin = strategist.deploy(EthCompound, strategy, "Compound")
-    strategy.addLender(compoundPlugin, {"from": strategist})
+    strategy.addLender(compoundPlugin, {"from": gov})
 
     dydxPlugin = strategist.deploy(GenericDyDx, strategy, "DyDx")
-    strategy.addLender(dydxPlugin, {"from": strategist})
+    strategy.addLender(dydxPlugin, {"from": gov})
+
+    # aavePlugin = strategist.deploy(GenericDyDx, strategy, "DyDx")
+    # strategy.addLender(dydxPlugin, {"from": gov})
 
     assert strategy.numLenders() == 4
     yield strategy

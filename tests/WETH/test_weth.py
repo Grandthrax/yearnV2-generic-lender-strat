@@ -67,7 +67,7 @@ def test_apr_weth(
 
         profit = (vault.totalAssets() - startingBalance) / 1e6
         strState = vault.strategies(strategy)
-        totalReturns = strState[6]
+        totalReturns = strState[7]
         totaleth = totalReturns / 1e6
         # print(f'Real Profit: {profit:.5f}')
         difff = profit - totaleth
@@ -131,10 +131,12 @@ def test_tend_trigger_weth(
     strategy.setWithdrawalThreshold(0, {"from": gov})
     assert strategy.numLenders() == 3
 
-    deposit_limit = 10_000
-    vault.addStrategy(strategy, deposit_limit, 0, 2 ** 256 - 1, 1000, {"from": gov})
+    deposit_limit = 100_000_000 * 1e18
+    debt_ratio = 10_000
+    vault.addStrategy(strategy, debt_ratio, 0, 2 ** 256 - 1, 500, {"from": gov})
+    vault.setDepositLimit(deposit_limit, {'from': gov})
 
-    whale_deposit = 10000 * 1e18
+    whale_deposit = 1_000 * 1e18
     vault.deposit(whale_deposit, {"from": whale})
 
     weth.withdraw(weth.balanceOf(whale), {"from": whale})
@@ -201,7 +203,6 @@ def test_debt_increase_weth(
 
     crETH = interface.CEtherI("0xD06527D5e56A3495252A528C4987003b712860eE")
     cETH = interface.CEtherI("0x4Ddc2D193948926D02f9B1fE9e1daa0718270ED5")
-    bank = interface.Bank("0x67B66C99D3Eb37Fa76Aa3Ed1ff33E8e39F0b9c7A")
 
     vault = Vault.deploy({"from": gov})
     vault.initialize(weth, gov, rewards, "", "")
@@ -222,20 +223,22 @@ def test_debt_increase_weth(
 
     dydxPlugin = strategist.deploy(GenericDyDx, strategy, "DyDx")
     strategy.addLender(dydxPlugin, {"from": gov})
-    strategy.setWithdrawalThreshold(0, {"from": gov})
     assert strategy.numLenders() == 4
 
-    deposit_limit = 10_000
-    vault.addStrategy(strategy, deposit_limit, 0, 2 ** 256 - 1, 1_000, {"from": gov})
+    strategy.setWithdrawalThreshold(0, {"from": gov})
+
+    debt_ratio = 10_000
+    vault.addStrategy(strategy, debt_ratio, 0, 2 ** 256 - 1, 500, {"from": gov})
 
     form = "{:.2%}"
     formS = "{:,.0f}"
-    firstDeposit = 1000 * 1e18
+    firstDeposit = 1_000 * 1e18
     predictedApr = strategy.estimatedFutureAPR(firstDeposit)
     print(
         f"Predicted APR from {formS.format(firstDeposit/1e18)} deposit: {form.format(predictedApr/1e18)}"
     )
     vault.deposit(firstDeposit, {"from": whale})
+
     print("Deposit: ", formS.format(firstDeposit / 1e18))
     strategy.harvest({"from": strategist})
     realApr = strategy.estimatedAPR()
