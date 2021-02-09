@@ -4,6 +4,58 @@ from useful_methods import genericStateOfStrat, genericStateOfVault, deposit, sl
 import random
 import brownie
 
+def test_030_live(
+    currency,
+    interface,
+    samdev,
+    Contract,
+    devychad,
+    live_guest_list,
+    AlphaHomo,
+    live_vault_weth_031,
+    live_strat_weth_031,
+    chain,
+    whale,
+    gov,
+    weth,
+    rando,
+    fn_isolation,
+):
+    gov = samdev
+    decimals = currency.decimals()
+    strategist = samdev
+    
+    vault = live_vault_weth_031
+    strategy = live_strat_weth_031
+    #alphaHomoPlugin = strategist.deploy(AlphaHomo, strategy, "Alpha Homo")
+    #strategy.addLender(alphaHomoPlugin, {"from": strategist})
+
+    #vault.setDepositLimit(1000*1e18, {"from": gov})
+
+    #deposit_limit = 9_800
+    #vault.addStrategy(strategy, deposit_limit, 0, 1000, {"from": gov})
+
+    weth.approve(vault, 2 ** 256 - 1, {"from": whale})
+    firstDeposit = 100 * 1e18
+
+    vault.deposit(firstDeposit, {"from": whale})
+
+    strategy.harvest({"from": strategist})
+
+
+    genericStateOfStrat(strategy, currency, vault)
+    genericStateOfVault(vault, currency)
+
+
+    form = "{:.2%}"
+    formS = "{:,.0f}"
+
+    status = strategy.lendStatuses()
+
+    for j in status:
+        print(
+            f"Lender: {j[0]}, Deposits: {formS.format(j[1]/1e18)}, APR: {form.format(j[2]/1e18)}"
+        )
 
 def test_live(
     currency,
