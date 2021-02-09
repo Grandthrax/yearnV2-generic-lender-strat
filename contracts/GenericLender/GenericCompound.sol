@@ -43,7 +43,7 @@ contract GenericCompound is GenericLenderBase {
 
         require(cToken.underlying() == address(want), "WRONG CTOKEN");
 
-        want.approve(_cToken, uint256(-1));
+        want.safeApprove(_cToken, uint256(-1));
     }
 
     function nav() external view override returns (uint256) {
@@ -59,6 +59,7 @@ contract GenericCompound is GenericLenderBase {
         if (currentCr == 0) {
             balance = 0;
         } else {
+            //The current exchange rate as an unsigned integer, scaled by 1e18.
             balance = currentCr.mul(cToken.exchangeRateStored()).div(1e18);
         }
     }
@@ -82,6 +83,7 @@ contract GenericCompound is GenericLenderBase {
 
     //emergency withdraw. sends balance plus amount to governance
     function emergencyWithdraw(uint256 amount) external override management {
+        //dont care about errors here. we want to exit what we can
         cToken.redeemUnderlying(amount);
 
         want.safeTransfer(vault.governance(), want.balanceOf(address(this)));
@@ -110,10 +112,10 @@ contract GenericCompound is GenericLenderBase {
 
             if (toWithdraw <= liquidity) {
                 //we can take all
-                cToken.redeemUnderlying(toWithdraw);
+                require(cToken.redeemUnderlying(toWithdraw) == 0, "ctoken: redeemUnderlying fail");
             } else {
                 //take all we can
-                cToken.redeemUnderlying(liquidity);
+                require(cToken.redeemUnderlying(liquidity) == 0, "ctoken: redeemUnderlying fail");
             }
         }
         _disposeOfComp();
@@ -137,18 +139,13 @@ contract GenericCompound is GenericLenderBase {
 
     function deposit() external override management {
         uint256 balance = want.balanceOf(address(this));
-        cToken.mint(balance);
+        require(cToken.mint(balance) == 0, "ctoken: mint fail");
     }
 
     function withdrawAll() external override management returns (bool) {
         uint256 invested = _nav();
         uint256 returned = _withdraw(invested);
         return returned >= invested;
-    }
-
-    //think about this
-    function enabled() external view override returns (bool) {
-        return true;
     }
 
     function hasAssets() external view override returns (bool) {

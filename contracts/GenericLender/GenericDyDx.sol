@@ -26,12 +26,12 @@ contract GenericDyDx is GenericLenderBase {
     using Address for address;
     using SafeMath for uint256;
 
-    uint256 private constant secondPerYear = 31_153_900; //todo
+    uint256 private constant secondPerYear = 31_153_900;
     address private constant SOLO = 0x1E0447b19BB6EcFdAe1e4AE1694b0C3659614e4e;
     uint256 public dydxMarketId;
 
     constructor(address _strategy, string memory name) public GenericLenderBase(_strategy, name) {
-        want.approve(SOLO, uint256(-1));
+        want.safeApprove(SOLO, uint256(-1));
 
         ISoloMargin solo = ISoloMargin(SOLO);
         uint256 numMarkets = solo.getNumMarkets();
@@ -154,11 +154,6 @@ contract GenericDyDx is GenericLenderBase {
         uint256 balance = _nav();
         uint256 returned = _withdraw(balance);
         return returned >= balance;
-    }
-
-    //think about this
-    function enabled() external view override returns (bool) {
-        return true;
     }
 
     function hasAssets() external view override returns (bool) {

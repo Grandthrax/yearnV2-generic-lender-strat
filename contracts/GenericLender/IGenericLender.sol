@@ -20,8 +20,6 @@ interface IGenericLender {
 
     function withdrawAll() external returns (bool);
 
-    function enabled() external view returns (bool);
-
     function hasAssets() external view returns (bool);
 
     function aprAfterDeposit(uint256 amount) external view returns (uint256);

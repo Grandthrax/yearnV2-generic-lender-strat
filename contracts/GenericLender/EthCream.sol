@@ -50,6 +50,7 @@ contract EthCream is GenericLenderBase {
         if (currentCr == 0) {
             balance = 0;
         } else {
+            //The current exchange rate as an unsigned integer, scaled by 1e18.
             balance = currentCr.mul(crETH.exchangeRateStored()).div(1e18);
         }
     }
@@ -73,6 +74,7 @@ contract EthCream is GenericLenderBase {
 
     //emergency withdraw. sends balance plus amount to governance
     function emergencyWithdraw(uint256 amount) external override management {
+        //dont care about error here
         crETH.redeemUnderlying(amount);
 
         //now turn to weth
@@ -104,10 +106,10 @@ contract EthCream is GenericLenderBase {
 
             if (toWithdraw <= liquidity) {
                 //we can take all
-                crETH.redeemUnderlying(toWithdraw);
+                require(crETH.redeemUnderlying(toWithdraw) == 0, "ctoken: redeemUnderlying fail");
             } else {
                 //take all we can
-                crETH.redeemUnderlying(liquidity);
+                require(crETH.redeemUnderlying(liquidity) == 0, "ctoken: redeemUnderlying fail");
             }
         }
 
@@ -121,7 +123,7 @@ contract EthCream is GenericLenderBase {
         uint256 balance = want.balanceOf(address(this));
 
         weth.withdraw(balance);
-        crETH.mint{value: balance}();
+        require(crETH.mint{value: balance}() == 0, "ctoken: mint fail");
     }
 
     function withdrawAll() external override management returns (bool) {
@@ -129,7 +131,7 @@ contract EthCream is GenericLenderBase {
 
         uint256 balance = crETH.balanceOf(address(this));
 
-        crETH.redeem(balance);
+        require(crETH.redeem(balance) == 0, "ctoken: redeem fail");
 
         uint256 withdrawn = address(this).balance;
         IWETH(weth).deposit{value: withdrawn}();
@@ -137,11 +139,6 @@ contract EthCream is GenericLenderBase {
         want.safeTransfer(address(strategy), returned);
 
         return returned.add(dust) >= invested;
-    }
-
-    //think about this
-    function enabled() external view override returns (bool) {
-        return true;
     }
 
     function hasAssets() external view override returns (bool) {

@@ -4,6 +4,7 @@ pragma solidity 0.6.12;
 import {VaultAPI} from "@yearnvaults/contracts/BaseStrategy.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
 import "./IGenericLender.sol";
 
@@ -28,6 +29,7 @@ interface IBaseStrategy {
 }
 
 abstract contract GenericLenderBase is IGenericLender {
+    using SafeERC20 for IERC20;
     VaultAPI public vault;
     address public override strategy;
     IERC20 public want;
@@ -42,7 +44,7 @@ abstract contract GenericLenderBase is IGenericLender {
         lenderName = name;
         dust = 10000;
 
-        want.approve(_strategy, uint256(-1));
+        want.safeApprove(_strategy, uint256(-1));
     }
 
     function setDust(uint256 _dust) external virtual override management {
@@ -53,7 +55,7 @@ abstract contract GenericLenderBase is IGenericLender {
         address[] memory _protectedTokens = protectedTokens();
         for (uint256 i; i < _protectedTokens.length; i++) require(_token != _protectedTokens[i], "!protected");
 
-        IERC20(_token).transfer(vault.governance(), IERC20(_token).balanceOf(address(this)));
+        IERC20(_token).safeTransfer(vault.governance(), IERC20(_token).balanceOf(address(this)));
     }
 
     function protectedTokens() internal view virtual returns (address[] memory);

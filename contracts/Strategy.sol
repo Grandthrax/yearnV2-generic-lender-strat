@@ -37,6 +37,7 @@ contract Strategy is BaseStrategy {
     address public constant uniswapRouter = address(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
     address public constant weth = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     uint256 public withdrawalThreshold  = 1e16;
+    uint256 public constant SECONDSPERYEAR = 31556952;
 
     IGenericLender[] public lenders;
     bool public externalOracle = false;
@@ -138,7 +139,7 @@ contract Strategy is BaseStrategy {
     // lent assets plus loose assets
     function estimatedTotalAssets() public view override returns (uint256) {
         uint256 nav = lentTotalAssets();
-        nav += want.balanceOf(address(this));
+        nav = nav.add(want.balanceOf(address(this)));
 
         return nav;
     }
@@ -157,7 +158,7 @@ contract Strategy is BaseStrategy {
         uint256 weightedAPR = 0;
 
         for (uint256 i = 0; i < lenders.length; i++) {
-            weightedAPR += lenders[i].weightedApr();
+            weightedAPR = weightedAPR.add(lenders[i].weightedApr());
         }
 
         return weightedAPR.div(bal);
@@ -182,7 +183,7 @@ contract Strategy is BaseStrategy {
 
         for (uint256 i = 0; i < lenders.length; i++) {
             if (i != aprChoice) {
-                weightedAPR += lenders[i].weightedApr();
+                weightedAPR = weightedAPR.add(lenders[i].weightedApr());
             }
         }
 
@@ -208,14 +209,14 @@ contract Strategy is BaseStrategy {
 
         for (uint256 i = 0; i < lenders.length; i++) {
             if (i != aprChoice) {
-                weightedAPR += lenders[i].weightedApr();
+                weightedAPR = weightedAPR.add(lenders[i].weightedApr());
             } else {
                 uint256 asset = lenders[i].nav();
                 if (asset < change) {
                     //simplistic. not accurate
                     change = asset;
                 }
-                weightedAPR += lowestApr.mul(change);
+                weightedAPR = weightedAPR.add(lowestApr.mul(change));
             }
         }
         uint256 bal = estimatedTotalAssets().add(change);
@@ -289,7 +290,7 @@ contract Strategy is BaseStrategy {
     function lentTotalAssets() public view returns (uint256) {
         uint256 nav = 0;
         for (uint256 i = 0; i < lenders.length; i++) {
-            nav += lenders[i].nav();
+            nav = nav.add(lenders[i].nav());
         }
         return nav;
     }
@@ -412,7 +413,7 @@ contract Strategy is BaseStrategy {
         uint16 share;
     }
 
-    //share must add up to 1000.
+    //share must add up to 1000. 500 means 50% etc
     function manualAllocation(lenderRatio[] memory _newPositions) public onlyAuthorized {
         uint256 share = 0;
 
@@ -427,13 +428,13 @@ contract Strategy is BaseStrategy {
 
             //might be annoying and expensive to do this second loop but worth it for safety
             for (uint256 j = 0; j < lenders.length; j++) {
-                if (address(lenders[j]) == _newPositions[j].lender) {
+                if (address(lenders[j]) == _newPositions[i].lender) {
                     found = true;
                 }
             }
             require(found, "NOT LENDER");
 
-            share += _newPositions[i].share;
+            share = share.add(_newPositions[i].share);
             uint256 toSend = assets.mul(_newPositions[i].share).div(1000);
             want.safeTransfer(_newPositions[i].lender, toSend);
             IGenericLender(_newPositions[i].lender).deposit();
@@ -444,6 +445,11 @@ contract Strategy is BaseStrategy {
 
     //cycle through withdrawing from worst rate first
     function _withdrawSome(uint256 _amount) internal returns (uint256 amountWithdrawn) {
+
+        if(lenders.length == 0){
+            return 0;
+        }
+
         //dont withdraw dust
         if (_amount < withdrawalThreshold) {
             return 0;
@@ -467,7 +473,7 @@ contract Strategy is BaseStrategy {
             if (!lenders[lowest].hasAssets()) {
                 return amountWithdrawn;
             }
-            amountWithdrawn += lenders[lowest].withdraw(_amount - amountWithdrawn);
+            amountWithdrawn = amountWithdrawn.add(lenders[lowest].withdraw(_amount - amountWithdrawn));
             j++;
             //dont want infinite loop
             if (j >= 6) {
@@ -545,12 +551,17 @@ contract Strategy is BaseStrategy {
         if (potential > lowestApr) {
             uint256 nav = lenders[lowest].nav();
 
-            //profit increase is 1 days profit with new apr
-            uint256 profitIncrease = (nav.mul(potential) - nav.mul(lowestApr)).div(1e18).div(365);
+            //To calculate our potential profit increase we work out how much extra 
+            //we would make in a typical harvest interlude. That is maxReportingDelay
+            //then we see if the extra profit is worth more than the gas cost * profitFactor
+
+            //safe math not needed here
+            //apr is scaled by 1e18 so we downscale here
+            uint256 profitIncrease = (nav.mul(potential) - nav.mul(lowestApr)).div(1e18).mul(maxReportDelay).div(SECONDSPERYEAR);
 
             uint256 wantCallCost = _callCostToWant(callCost);
 
-            return (wantCallCost * callCost < profitIncrease);
+            return (wantCallCost.mul(profitFactor) < profitIncrease);
         }
     }
 

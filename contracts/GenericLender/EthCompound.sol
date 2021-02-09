@@ -56,6 +56,7 @@ contract EthCompound is GenericLenderBase {
         if (currentCr == 0) {
             balance = 0;
         } else {
+            //The current exchange rate as an unsigned integer, scaled by 1e18.
             balance = currentCr.mul(crETH.exchangeRateStored()).div(1e18);
         }
     }
@@ -110,10 +111,10 @@ contract EthCompound is GenericLenderBase {
 
             if (toWithdraw <= liquidity) {
                 //we can take all
-                crETH.redeemUnderlying(toWithdraw);
+                require(crETH.redeemUnderlying(toWithdraw) == 0, "ctoken: redeemUnderlying fail");
             } else {
                 //take all we can
-                crETH.redeemUnderlying(liquidity);
+                require(crETH.redeemUnderlying(liquidity) == 0, "ctoken: redeemUnderlying fail");
             }
         }
 
@@ -150,7 +151,7 @@ contract EthCompound is GenericLenderBase {
 
         uint256 balance = crETH.balanceOf(address(this));
 
-        crETH.redeem(balance);
+        require(crETH.redeem(balance) == 0, "ctoken: redeem fail");
 
         uint256 withdrawn = address(this).balance;
         IWETH(weth).deposit{value: withdrawn}();
@@ -158,11 +159,6 @@ contract EthCompound is GenericLenderBase {
         want.safeTransfer(address(strategy), returned);
 
         return returned.add(dust) >= invested;
-    }
-
-    //think about this
-    function enabled() external view override returns (bool) {
-        return true;
     }
 
     function hasAssets() external view override returns (bool) {
@@ -186,6 +182,7 @@ contract EthCompound is GenericLenderBase {
         //the supply rate is derived from the borrow rate, reserve factor and the amount of total borrows.
         (, uint256 borrowRate) = model.getBorrowRate(cashPrior.add(amount), borrows, reserves);
 
+        //we scale up and down by 1e18 to keep precision
         uint256 borrowsPer = uint256(1e18).mul(borrows).div(underlying);
 
         uint256 supplyRate = borrowRate.mul(uint256(1e18).sub(reserverFactor)).mul(borrowsPer).div(1e18).div(1e18);
