@@ -26,7 +26,7 @@ def test_withdrawals_weth_work(
     currency.approve(vault, 2 ** 256 - 1, {"from": strategist})
 
     deposit_limit = 1_000_000_000 * (10 ** (decimals))
-    vault.addStrategy(strategy, deposit_limit, deposit_limit, 500, {"from": gov})
+    vault.addStrategy(strategy, deposit_limit, 0, 2 ** 256 - 1, 500, {"from": gov})
 
     status = strategy.lendStatuses()
     depositAmount = 5 * (10 ** (decimals))

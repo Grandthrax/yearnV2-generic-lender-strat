@@ -6,17 +6,7 @@ import brownie
 
 
 def test_normal_hegic(
-    hegic,
-    Strategy,
-    crHegic,
-    chain,
-    whale,
-    gov,
-    strategist,
-    rando,
-    vault,
-    strategy,
-    fn_isolation,
+    hegic, crHegic, chain, whale, gov, strategist, rando, vault, strategy, fn_isolation,
 ):
 
     currency = hegic
@@ -29,7 +19,7 @@ def test_normal_hegic(
 
     deposit_limit = 1_000_000_000 * (10 ** (decimals))
     vault.setDepositLimit(deposit_limit, {"from": gov})
-    vault.addStrategy(strategy, 10_000, 0, 500, {"from": gov})
+    vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 500, {"from": gov})
 
     # our humble strategist deposits some test funds
     depositAmount = 501 * (10 ** (decimals))
@@ -140,7 +130,7 @@ def test_apr_hegic(
 
     deposit_limit = 1_000_000_000 * 1e18
     vault.setDepositLimit(deposit_limit, {"from": gov})
-    vault.addStrategy(strategy, 10_000, 0, 500, {"from": gov})
+    vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 500, {"from": gov})
     hegic.approve(vault, 2 ** 256 - 1, {"from": whale})
 
     whale_deposit = 1_000_000 * 1e18
