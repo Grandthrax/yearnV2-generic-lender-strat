@@ -4,6 +4,7 @@ from useful_methods import genericStateOfStrat, genericStateOfVault, deposit, sl
 import random
 import brownie
 
+
 def test_030_live(
     currency,
     interface,
@@ -24,16 +25,9 @@ def test_030_live(
     gov = samdev
     decimals = currency.decimals()
     strategist = samdev
-    
+
     vault = live_vault_weth_031
     strategy = live_strat_weth_031
-    #alphaHomoPlugin = strategist.deploy(AlphaHomo, strategy, "Alpha Homo")
-    #strategy.addLender(alphaHomoPlugin, {"from": strategist})
-
-    #vault.setDepositLimit(1000*1e18, {"from": gov})
-
-    #deposit_limit = 9_800
-    #vault.addStrategy(strategy, deposit_limit, 0, 1000, {"from": gov})
 
     weth.approve(vault, 2 ** 256 - 1, {"from": whale})
     firstDeposit = 100 * 1e18
@@ -42,10 +36,8 @@ def test_030_live(
 
     strategy.harvest({"from": strategist})
 
-
     genericStateOfStrat(strategy, currency, vault)
     genericStateOfVault(vault, currency)
-
 
     form = "{:.2%}"
     formS = "{:,.0f}"
@@ -56,6 +48,7 @@ def test_030_live(
         print(
             f"Lender: {j[0]}, Deposits: {formS.format(j[1]/1e18)}, APR: {form.format(j[2]/1e18)}"
         )
+
 
 def test_live(
     currency,
@@ -129,14 +122,14 @@ def test_live2(
 
     addresses = [whale]
     permissions = [True]
-    # strategy.addLender(live_dydxweth, {"from": strategist})
+
     print(strategy)
     print(vault)
     guestList = Contract("0xcB16133a37Ef19F90C570B426292BDcca185BF47")
     vault.setDepositLimit(500 * 1e18, {"from": gov})
     vault.setGuestList(guestList, {"from": gov})
     print("guest list, ", vault.guestList())
-    vault.addStrategy(strategy, 500 * 1e18, 500 * 1e18, 1000, {"from": gov})
+    vault.addStrategy(strategy, 500 * 1e18, 0, 2 ** 256 - 1, 1000, {"from": gov})
 
     genericStateOfStrat(strategy, currency, vault)
     genericStateOfVault(vault, currency)

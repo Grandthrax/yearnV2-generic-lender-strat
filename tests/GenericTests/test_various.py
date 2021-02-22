@@ -8,38 +8,38 @@ import brownie
 def test_donations(strategy, web3, chain, vault, currency, whale, strategist, gov):
     deposit_limit = Wei("1000 ether")
     vault.setDepositLimit(deposit_limit, {"from": gov})
-    vault.addStrategy(strategy, 10_000, 0, 50, {"from": gov})
+    vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 50, {"from": gov})
     amount = Wei("50 ether")
     deposit(amount, gov, currency, vault)
-    assert vault.strategies(strategy)[5] == 0
+    assert vault.strategies(strategy).dict()["totalDebt"] == 0
     strategy.harvest({"from": gov})
-    assert vault.strategies(strategy)[6] == 0
+    assert vault.strategies(strategy).dict()["totalGain"] == 0
 
     donation = Wei("1 ether")
 
     # donation to strategy
     currency.transfer(strategy, donation, {"from": whale})
-    assert vault.strategies(strategy)[6] == 0
+    assert vault.strategies(strategy).dict()["totalGain"] == 0
     strategy.harvest({"from": gov})
-    assert vault.strategies(strategy)[6] >= donation
+    assert vault.strategies(strategy).dict()["totalGain"] >= donation
     assert currency.balanceOf(vault) >= donation
 
     strategy.harvest({"from": gov})
-    assert vault.strategies(strategy)[5] >= donation + amount
+    assert vault.strategies(strategy).dict()["totalDebt"] >= donation + amount
 
     # donation to vault
     currency.transfer(vault, donation, {"from": whale})
     assert (
-        vault.strategies(strategy)[6] >= donation
-        and vault.strategies(strategy)[6] < donation * 2
+        vault.strategies(strategy).dict()["totalGain"] >= donation
+        and vault.strategies(strategy).dict()["totalGain"] < donation * 2
     )
     strategy.harvest({"from": gov})
-    assert vault.strategies(strategy)[5] >= donation * 2 + amount
+    assert vault.strategies(strategy).dict()["totalDebt"] >= donation * 2 + amount
     strategy.harvest({"from": gov})
 
     assert (
-        vault.strategies(strategy)[6] >= donation
-        and vault.strategies(strategy)[6] < donation * 2
+        vault.strategies(strategy).dict()["totalGain"] >= donation
+        and vault.strategies(strategy).dict()["totalGain"] < donation * 2
     )
     # check share price is close to expected
     assert (
@@ -54,7 +54,7 @@ def test_good_migration(
     # Call this once to seed the strategy with debt
     deposit_limit = Wei("1000 ether")
     vault.setDepositLimit(deposit_limit, {"from": gov})
-    vault.addStrategy(strategy, 10_000, 0, 50, {"from": gov})
+    vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 50, {"from": gov})
 
     amount1 = Wei("500 ether")
     deposit(amount1, whale, currency, vault)
@@ -94,7 +94,7 @@ def test_vault_shares_generic(
     # set limit to the vault
     vault.setDepositLimit(deposit_limit, {"from": gov})
 
-    vault.addStrategy(strategy, 10_000, 0, 0, {"from": gov})
+    vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 0, {"from": gov})
     print(currency)
 
     assert vault.totalSupply() == 0
@@ -149,7 +149,7 @@ def test_vault_emergency_exit_generic(
 ):
     deposit_limit = Wei("1000000 ether")
     vault.setDepositLimit(deposit_limit, {"from": gov})
-    vault.addStrategy(strategy, 10_000, 0, 50, {"from": gov})
+    vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 50, {"from": gov})
 
     amount0 = Wei("500 ether")
     deposit(amount0, whale, currency, vault)
@@ -186,7 +186,7 @@ def test_strat_emergency_exit_generic(
 
     deposit_limit = Wei("1000000 ether")
     vault.setDepositLimit(deposit_limit, {"from": gov})
-    vault.addStrategy(strategy, 10_000, 0, 50, {"from": gov})
+    vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 50, {"from": gov})
 
     amount0 = Wei("500 ether")
     deposit(amount0, whale, currency, vault)
@@ -216,7 +216,7 @@ def test_strat_graceful_exit_generic(
 
     deposit_limit = Wei("1000000 ether")
     vault.setDepositLimit(deposit_limit, {"from": gov})
-    vault.addStrategy(strategy, 10_000, 0, 50, {"from": gov})
+    vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 50, {"from": gov})
 
     amount0 = Wei("500 ether")
     deposit(amount0, whale, currency, vault)
@@ -239,7 +239,7 @@ def test_apr_generic(strategy, web3, chain, vault, currency, whale, strategist, 
 
     deposit_limit = Wei("1000000 ether")
     vault.setDepositLimit(deposit_limit, {"from": gov})
-    vault.addStrategy(strategy, 10_000, 0, 50, {"from": gov})
+    vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 50, {"from": gov})
 
     deposit_amount = Wei("1000 ether")
     deposit(deposit_amount, whale, currency, vault)
@@ -256,8 +256,8 @@ def test_apr_generic(strategy, web3, chain, vault, currency, whale, strategist, 
         strategy.harvest({"from": strategist})
 
         profit = (vault.totalAssets() - startingBalance).to("ether")
-        strState = vault.strategies(strategy)
-        totalReturns = strState[6]
+        strState = vault.strategies(strategy).dict()
+        totalReturns = strState["totalGain"]
         totaleth = totalReturns.to("ether")
         difff = profit - totaleth
 

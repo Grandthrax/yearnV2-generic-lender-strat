@@ -38,7 +38,7 @@ def test_apr_weth(
     # assert strategy.numLenders() == 2
 
     deposit_limit = 10_000
-    vault.addStrategy(strategy, deposit_limit, 0, 1000, {"from": gov})
+    vault.addStrategy(strategy, deposit_limit, 0, 2 ** 256 - 1, 1000, {"from": gov})
 
     whale_deposit = 1000 * 1e18
     vault.deposit(whale_deposit, {"from": whale})
@@ -53,7 +53,7 @@ def test_apr_weth(
     strategy.harvest({"from": strategist})
     startingBalance = vault.totalAssets()
     for i in range(2):
-        
+
         waitBlock = 25
         # print(f'\n----wait {waitBlock} blocks----')
         chain.mine(waitBlock)
@@ -88,10 +88,9 @@ def test_apr_weth(
     assert vBal > 0
     print(vBal)
     vBefore = vault.balanceOf(strategist)
-    vault.transferFrom(strategy, strategist, vBal, {'from': strategist})
+    vault.transferFrom(strategy, strategist, vBal, {"from": strategist})
     print(vault.balanceOf(strategist) - vBefore)
     assert vault.balanceOf(strategist) - vBefore > 0
-
 
 
 def test_tend_trigger_weth(
@@ -112,7 +111,7 @@ def test_tend_trigger_weth(
     crETH = interface.CEtherI("0xD06527D5e56A3495252A528C4987003b712860eE")
     cETH = interface.CEtherI("0x4Ddc2D193948926D02f9B1fE9e1daa0718270ED5")
     bank = interface.Bank("0x67B66C99D3Eb37Fa76Aa3Ed1ff33E8e39F0b9c7A")
-    
+
     vault = Vault.deploy({"from": gov})
     vault.initialize(weth, gov, rewards, "", "")
     vault.setDepositLimit(2 ** 256 - 1, {"from": gov})
@@ -133,7 +132,7 @@ def test_tend_trigger_weth(
     assert strategy.numLenders() == 3
 
     deposit_limit = 10_000
-    vault.addStrategy(strategy, deposit_limit, 0, 1000, {"from": gov})
+    vault.addStrategy(strategy, deposit_limit, 0, 2 ** 256 - 1, 1000, {"from": gov})
 
     whale_deposit = 10000 * 1e18
     vault.deposit(whale_deposit, {"from": whale})
@@ -208,7 +207,6 @@ def test_debt_increase_weth(
     vault.initialize(weth, gov, rewards, "", "")
     vault.setDepositLimit(2 ** 256 - 1, {"from": gov})
 
-
     weth.approve(vault, 2 ** 256 - 1, {"from": whale})
 
     strategy = strategist.deploy(Strategy, vault)
@@ -228,7 +226,7 @@ def test_debt_increase_weth(
     assert strategy.numLenders() == 4
 
     deposit_limit = 10_000
-    vault.addStrategy(strategy, deposit_limit, 0, 1000, {"from": gov})
+    vault.addStrategy(strategy, deposit_limit, 0, 2 ** 256 - 1, 1_000, {"from": gov})
 
     form = "{:.2%}"
     formS = "{:,.0f}"
@@ -295,11 +293,9 @@ def test_debt_increment_weth(
     bank = interface.Bank("0x67B66C99D3Eb37Fa76Aa3Ed1ff33E8e39F0b9c7A")
     balance = whale.balance() - 1e18  # leave 1 eth for gas
 
-    
     vault = Vault.deploy({"from": gov})
     vault.initialize(weth, gov, rewards, "", "")
     vault.setDepositLimit(2 ** 256 - 1, {"from": gov})
-
 
     weth.approve(vault, 2 ** 256 - 1, {"from": whale})
     weth.deposit({"from": whale, "value": balance})
@@ -321,7 +317,7 @@ def test_debt_increment_weth(
     assert strategy.numLenders() == 4
 
     deposit_limit = 10_000
-    vault.addStrategy(strategy, deposit_limit, 0, 1000, {"from": gov})
+    vault.addStrategy(strategy, deposit_limit, 0, 2 ** 256 - 1, 1000, {"from": gov})
 
     form = "{:.2%}"
     formS = "{:,.0f}"

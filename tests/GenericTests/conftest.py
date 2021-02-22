@@ -1,5 +1,5 @@
 import pytest
-from brownie import Wei, config
+from brownie import Wei, config, Contract
 
 
 @pytest.fixture
@@ -147,9 +147,4 @@ def strategy(
     compoundPlugin = strategist.deploy(EthCompound, strategy, "Compound")
     strategy.addLender(compoundPlugin, {"from": gov})
 
-    yield strategy
-
-
-@pytest.fixture
-def strategy_deployed(strategy):
     yield strategy

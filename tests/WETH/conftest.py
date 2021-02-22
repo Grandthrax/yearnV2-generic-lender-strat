@@ -37,10 +37,10 @@ def live_strat_weth_1(Strategy):
 def live_strat_weth_2(Strategy):
     yield Strategy.at("0x460612682cE6ED51C1A9813F6938671D9D135d6D")
 
+
 @pytest.fixture
 def live_strat_weth_031(Strategy):
     yield Strategy.at("0xac5DA2Ca938A7328dE563D7d7209370e24BFd21e")
-    
 
 
 @pytest.fixture
@@ -53,6 +53,7 @@ def live_vault_weth_2(pm):
 def live_vault_weth(pm):
     Vault = pm(config["dependencies"][0]).Vault
     yield Vault.at("0x18c447b7Ad755379B8800F1Ef5165E8542946Afd")
+
 
 @pytest.fixture
 def live_vault_weth_031(pm):

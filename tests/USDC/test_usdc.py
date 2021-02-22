@@ -14,7 +14,7 @@ def test_good_migration(
     usdc.approve(vault, 2 ** 256 - 1, {"from": strategist})
 
     deposit_limit = 1_000_000_000 * 1e6
-    vault.addStrategy(strategy, deposit_limit, deposit_limit, 500, {"from": gov})
+    vault.addStrategy(strategy, deposit_limit, 0, 2 ** 256 - 1, 500, {"from": gov})
 
     amount1 = 500 * 1e6
     vault.deposit(amount1, {"from": whale})
@@ -71,7 +71,7 @@ def test_normal_activity(
     usdc.approve(vault, 2 ** 256 - 1, {"from": strategist})
 
     deposit_limit = 1_000_000_000 * (10 ** (decimals))
-    vault.addStrategy(strategy, deposit_limit, deposit_limit, 500, {"from": gov})
+    vault.addStrategy(strategy, deposit_limit, 0, 2 ** 256 - 1, 500, {"from": gov})
 
     # our humble strategist deposits some test funds
     depositAmount = 501 * (10 ** (decimals))
@@ -167,7 +167,7 @@ def test_debt_increase(
     usdc.approve(vault, 2 ** 256 - 1, {"from": whale})
 
     deposit_limit = 100_000_000 * 1e6
-    vault.addStrategy(strategy, deposit_limit, deposit_limit, 500, {"from": gov})
+    vault.addStrategy(strategy, deposit_limit, 0, 2 ** 256 - 1, 500, {"from": gov})
 
     form = "{:.2%}"
     formS = "{:,.0f}"
@@ -225,7 +225,7 @@ def test_vault_shares(
     fn_isolation,
 ):
     deposit_limit = 100_000_000 * 1e6
-    vault.addStrategy(strategy, deposit_limit, deposit_limit, 500, {"from": gov})
+    vault.addStrategy(strategy, deposit_limit, 0, 2 ** 256 - 1, 500, {"from": gov})
     decimals = currency.decimals()
     amount1 = 100000 * (10 ** decimals)
 
@@ -321,7 +321,7 @@ def test_apr(
 ):
     decimals = currency.decimals()
     deposit_limit = 100_000_000 * 1e6
-    vault.addStrategy(strategy, deposit_limit, deposit_limit, 500, {"from": gov})
+    vault.addStrategy(strategy, deposit_limit, 0, 2 ** 256 - 1, 500, {"from": gov})
     andre = whale
     gov = strategist
     amount1 = 50 * (10 ** decimals)
@@ -402,7 +402,7 @@ def test_manual_override(
 
     ecimals = currency.decimals()
     deposit_limit = 100_000_000 * (10 ** decimals)
-    vault.addStrategy(strategy, deposit_limit, deposit_limit, 500, {"from": gov})
+    vault.addStrategy(strategy, deposit_limit, 0, 2 ** 256 - 1, 500, {"from": gov})
     andre = whale
     gov = strategist
     amount1 = 50 * (10 ** decimals)
