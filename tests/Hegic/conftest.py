@@ -130,25 +130,27 @@ def vault(gov, rewards, guardian, currency, pm):
     yield vault
 
 
+
+@pytest.fixture
+def hegic_cream_lender(strategist, GenericCream, strategy, crHegic)
+    yield strategist.deploy(GenericCream, strategy, "Cream", crHegic)
+
+
 @pytest.fixture
 def strategy(
     strategist,
     gov,
     keeper,
     vault,
-    crUsdc,
-    cUsdc,
-    crHegic,
     Strategy,
-    GenericCompound,
     GenericCream,
-    GenericDyDx,
+    crHegic
 ):
     strategy = strategist.deploy(Strategy, vault)
     strategy.setKeeper(keeper)
 
     creamPlugin = strategist.deploy(GenericCream, strategy, "Cream", crHegic)
-    strategy.addLender(creamPlugin, {"from": gov})
+    strategy.addLender(hegic_cream_lender, {"from": gov})
 
     assert strategy.numLenders() == 1
 

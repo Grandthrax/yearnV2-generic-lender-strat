@@ -34,17 +34,51 @@ abstract contract GenericLenderBase is IGenericLender {
     address public override strategy;
     IERC20 public want;
     string public override lenderName;
-
     uint256 public dust;
 
-    constructor(address _strategy, string memory name) public {
+    event Cloned(address indexed clone);
+
+    constructor(address _strategy, string memory _name) public {
+        _initialize(_strategy, _name);
+    }
+
+    function _initialize(address _strategy, string memory _name) internal {
+        require(address(strategy) == address(0), "Lender already initialized");
+
         strategy = _strategy;
         vault = VaultAPI(IBaseStrategy(strategy).vault());
         want = IERC20(vault.token());
-        lenderName = name;
+        lenderName = _name;
         dust = 10000;
 
         want.safeApprove(_strategy, uint256(-1));
+    }
+
+    function initialize(
+        address _strategy,
+        string memory _name
+    ) external {
+        _initialize(_strategy, _name);
+    }
+
+    function clone(
+        address _strategy,
+        string memory _name
+    ) external returns (address newLender) {
+        // Copied from https://github.com/optionality/clone-factory/blob/master/contracts/CloneFactory.sol
+        bytes20 addressBytes = bytes20(address(this));
+
+        assembly {
+            // EIP-1167 bytecode
+            let clone_code := mload(0x40)
+            mstore(clone_code, 0x3d602d80600a3d3981f3363d3d373d3d3d363d73000000000000000000000000)
+            mstore(add(clone_code, 0x14), addressBytes)
+            mstore(add(clone_code, 0x28), 0x5af43d82803e903d91602b57fd5bf30000000000000000000000000000000000)
+            newLender := create(0, clone_code, 0x37)
+        }
+
+        GenericLenderBase(newLender).initialize(_strategy, _name);
+        emit Cloned(newLender);
     }
 
     function setDust(uint256 _dust) external virtual override management {
