@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/math/Math.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
-import {BaseStrategyInitializable} from "@yearnvaults/contracts/BaseStrategy.sol";
+import "@yearnvaults/contracts/BaseStrategy.sol";
 
 import "./GenericLender/IGenericLender.sol";
 import "./WantToEthOracle/IWantToEth.sol";
@@ -28,7 +28,7 @@ interface IUni {
  *
  ********************* */
 
-contract Strategy is BaseStrategyInitializable {
+contract Strategy is BaseStrategy {
     using SafeERC20 for IERC20;
     using Address for address;
     using SafeMath for uint256;
@@ -42,37 +42,10 @@ contract Strategy is BaseStrategyInitializable {
     bool public externalOracle = false;
     address public wantToEthOracle;
 
-    event Cloned(address indexed clone);
+   
 
-    constructor(address _vault) public BaseStrategyInitializable(_vault) {
+    constructor(address _vault) public BaseStrategy(_vault) {
         debtThreshold = 100 * 1e18;
-    }
-
-    function clone(address _vault) external returns (address newStrategy) {
-        newStrategy = this.clone(_vault, msg.sender, msg.sender, msg.sender);
-    }
-
-    function clone(
-        address _vault,
-        address _strategist,
-        address _rewards,
-        address _keeper
-    ) external returns (address newStrategy) {
-        // Copied from https://github.com/optionality/clone-factory/blob/master/contracts/CloneFactory.sol
-        bytes20 addressBytes = bytes20(address(this));
-
-        assembly {
-            // EIP-1167 bytecode
-            let clone_code := mload(0x40)
-            mstore(clone_code, 0x3d602d80600a3d3981f3363d3d373d3d3d363d73000000000000000000000000)
-            mstore(add(clone_code, 0x14), addressBytes)
-            mstore(add(clone_code, 0x28), 0x5af43d82803e903d91602b57fd5bf30000000000000000000000000000000000)
-            newStrategy := create(0, clone_code, 0x37)
-        }
-
-        BaseStrategyInitializable(newStrategy).initialize(_vault, _strategist, _rewards, _keeper);
-
-        emit Cloned(newStrategy);
     }
 
     function setWithdrawalThreshold(uint256 _threshold) external onlyAuthorized {

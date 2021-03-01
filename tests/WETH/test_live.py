@@ -5,7 +5,7 @@ import random
 import brownie
 
 
-def test_030_live(
+def test_032_live(
     currency,
     interface,
     samdev,
@@ -13,12 +13,13 @@ def test_030_live(
     devychad,
     live_guest_list,
     AlphaHomo,
-    live_vault_weth_031,
-    live_strat_weth_031,
+    live_vault_weth_032,
+    live_strat_weth_032,
     chain,
     whale,
     gov,
     weth,
+    accounts,
     rando,
     fn_isolation,
 ):
@@ -26,8 +27,12 @@ def test_030_live(
     decimals = currency.decimals()
     strategist = samdev
 
-    vault = live_vault_weth_031
-    strategy = live_strat_weth_031
+    vault = live_vault_weth_032
+    strategy = live_strat_weth_032
+
+    daddy = accounts.at("0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52", force=True)
+    vault.acceptGovernance({'from': daddy})
+
 
     weth.approve(vault, 2 ** 256 - 1, {"from": whale})
     firstDeposit = 100 * 1e18
@@ -129,7 +134,7 @@ def test_live2(
     vault.setDepositLimit(500 * 1e18, {"from": gov})
     vault.setGuestList(guestList, {"from": gov})
     print("guest list, ", vault.guestList())
-    vault.addStrategy(strategy, 500 * 1e18, 0, 2 ** 256 - 1, 1000, {"from": gov})
+    vault.addStrategy(strategy, 200, 0, 1000, {"from": gov})
 
     genericStateOfStrat(strategy, currency, vault)
     genericStateOfVault(vault, currency)

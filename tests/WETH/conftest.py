@@ -60,11 +60,31 @@ def live_vault_weth_031(pm):
     Vault = pm(config["dependencies"][0]).Vault
     yield Vault.at("0xac333895ce1A73875CF7B4Ecdc5A743C12f3d82B")
 
+@pytest.fixture
+def live_vault_dai_030(Contract):
+        
+    yield Contract.from_explorer("0x19D3364A399d251E894aC732651be8B0E4e85001")
+
+@pytest.fixture
+def live_strat_dai_030(Strategy):
+    yield Strategy.at("0x32b8C26d0439e1959CEa6262CBabC12320b384c4")
+
+@pytest.fixture
+def live_Alpha_Homo_032(AlphaHomo):
+    yield AlphaHomo.at("0xF0caBF8Cf60155091aCF657c441DC7b2276D851C")
+
+@pytest.fixture
+def live_vault_weth_032(pm):
+    Vault = pm(config["dependencies"][0]).Vault
+    yield Vault.at("0xa9fE4601811213c340e850ea305481afF02f5b28")
+
+@pytest.fixture
+def live_strat_weth_032(Strategy):
+    yield Strategy.at("0xeE697232DF2226c9fB3F02a57062c4208f287851")
 
 @pytest.fixture
 def live_Alpha_Homo_2(AlphaHomo):
     yield AlphaHomo.at("0x74bE25172F8aFFF92CA6e27418d601D74ACC2525")
-
 
 @pytest.fixture
 def live_Alpha_Homo(AlphaHomo):
@@ -80,6 +100,13 @@ def live_EthCompound(EthCompound):
 def live_dydxweth(GenericDyDx):
     yield GenericDyDx.at("0x1F2699B3aaf3F04b61B99B776b4a21a08502AE73")
 
+@pytest.fixture
+def live_creamdai(GenericCream):
+    yield GenericCream.at("0xC53a7A7bEB51141b750b2752cD1276150a511daa")
+
+@pytest.fixture
+def live_dydxdai(GenericDyDx):
+    yield GenericDyDx.at("0xed2F20ACbb4809BB2F62da75cbE3A0Df557d955E")
 
 @pytest.fixture
 def live_guest_list(pm):
@@ -125,6 +152,9 @@ def samdev(accounts):
 def devychad(accounts):
     yield accounts.at("0x846e211e8ba920b353fb717631c015cf04061cc9", force=True)
 
+@pytest.fixture
+def daddy(accounts):
+    yield accounts.at("0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52", force=True)
 
 @pytest.fixture
 def gov(accounts):
@@ -173,7 +203,6 @@ def dai(interface):
 def weth(interface):
     yield interface.IWETH("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2")
 
-
 @pytest.fixture
 def cdai(interface):
     yield interface.CErc20I("0x5d3a536e4d6dbd6114cc1ead35777bab948e3643")
@@ -188,6 +217,9 @@ def cUsdc(interface):
 def crUsdc(interface):
     yield interface.CErc20I("0x44fbeBd2F576670a6C33f6Fc0B00aA8c5753b322")
 
+@pytest.fixture
+def crDai(interface):
+    yield interface.CErc20I("0x92B767185fB3B04F881e3aC8e5B0662a027A1D9f")
 
 @pytest.fixture(scope="module", autouse=True)
 def shared_setup(module_isolation):
