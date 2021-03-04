@@ -5,7 +5,7 @@ import random
 import brownie
 
 
-def test_clone(
+def xtest_clone(
     chain,
     whale,
     gov,
@@ -37,7 +37,9 @@ def test_clone(
     cloned_strategy = Strategy.at(tx.return_value)
     assert cloned_strategy.numLenders() == 0
 
-    tx = GenericCream.at(strategy.lenders(0)).clone(cloned_strategy, "Cream2", crHegic)
+    tx = GenericCream.at(strategy.lenders(0)).cloneCreamLender(
+        cloned_strategy, "Cream2", crHegic
+    )
     cloned_lender = GenericCream.at(tx.return_value)
     assert cloned_lender.lenderName() == "Cream2"
     cloned_strategy.addLender(cloned_lender, {"from": gov})
@@ -111,3 +113,21 @@ def test_clone(
     profit = balanceAfter - starting_balance
     assert profit > 0
     print(profit)
+
+
+def test_double_initialize(
+    gov, vault, strategy, hegic, GenericCream, crHegic,
+):
+
+    tx = GenericCream.at(strategy.lenders(0)).cloneCreamLender(
+        strategy, "Cream2", crHegic
+    )
+    cloned_lender = GenericCream.at(tx.return_value)
+
+    # Shouldn't be able to call super's initialize
+    with brownie.reverts():
+        cloned_lender.initialize(crHegic, {"from": gov})
+
+    # Shouldn't be able to call GenericCream's initialize
+    with brownie.reverts():
+        cloned_lender.initialize(strategy, "Cream2", {"from": gov})

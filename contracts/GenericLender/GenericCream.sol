@@ -40,12 +40,13 @@ contract GenericCream is GenericLenderBase {
     }
 
     function _initialize(address _cToken) internal {
+        require(address(cToken) == address(0), "GenericCream already initialized");
         cToken = CErc20I(_cToken);
         require(cToken.underlying() == address(want), "WRONG CTOKEN");
         want.safeApprove(_cToken, uint256(-1));
     }
 
-    function clone(
+    function cloneCreamLender(
         address _strategy,
         string memory _name,
         address _cToken

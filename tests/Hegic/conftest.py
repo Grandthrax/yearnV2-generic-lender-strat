@@ -131,11 +131,6 @@ def vault(gov, rewards, guardian, currency, pm):
 
 
 @pytest.fixture
-def hegic_cream_lender(strategist, GenericCream, strategy, crHegic):
-    yield strategist.deploy(GenericCream, strategy, "Cream", crHegic)
-
-
-@pytest.fixture
 def strategy(strategist, gov, keeper, vault, Strategy, GenericCream, crHegic):
     strategy = strategist.deploy(Strategy, vault)
     strategy.setKeeper(keeper)
