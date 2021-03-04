@@ -48,11 +48,14 @@ def xtest_clone(
     assert cloned_strategy.harvestTrigger(1) == True
     cloned_strategy.harvest({"from": strategist})
 
+    chain.mine(1)
+    crHegic.mint(0, {"from": strategist})
+
     # whale deposits as well
-    # whale_deposit = 100_000 * (10 ** (decimals))
-    # vault.deposit(whale_deposit, {"from": whale})
-    # assert cloned_strategy.harvestTrigger(1000) == True
-    # cloned_strategy.harvest({"from": strategist})
+    whale_deposit = 100_000 * (10 ** (decimals))
+    vault.deposit(whale_deposit, {"from": whale})
+    assert cloned_strategy.harvestTrigger(1000) == True
+    cloned_strategy.harvest({"from": strategist})
 
     for i in range(15):
         waitBlock = random.randint(10, 50)
