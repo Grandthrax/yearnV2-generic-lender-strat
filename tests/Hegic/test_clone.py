@@ -5,7 +5,18 @@ import random
 import brownie
 
 
-def test_clone(chain, whale, gov, strategist, vault, strategy, hegic_cream_lender, crHegic):
+def test_clone(
+    chain,
+    whale,
+    gov,
+    strategist,
+    vault,
+    Strategy,
+    strategy,
+    hegic,
+    GenericCream,
+    crHegic,
+):
 
     currency = hegic
     starting_balance = currency.balanceOf(strategist)
@@ -22,23 +33,24 @@ def test_clone(chain, whale, gov, strategist, vault, strategy, hegic_cream_lende
     vault.deposit(depositAmount, {"from": strategist})
 
     # Clone magic
-    cloned_strategy = strategy.clone(vault)
+    tx = strategy.clone(vault)
+    cloned_strategy = Strategy.at(tx.return_value)
     assert cloned_strategy.numLenders() == 0
-    cloned_lender = hegic_cream_lender.clone(cloned_strategy, "Cream2", crHegic)
-    assert cloned_lender.name() == "Cream2"
-    cloned_strategy.addLender(cloned_lender)
 
+    tx = GenericCream.at(strategy.lenders(0)).clone(cloned_strategy, "Cream2", crHegic)
+    cloned_lender = GenericCream.at(tx.return_value)
+    assert cloned_lender.lenderName() == "Cream2"
+    cloned_strategy.addLender(cloned_lender, {"from": gov})
 
     vault.addStrategy(cloned_strategy, 10_000, 0, 2 ** 256 - 1, 500, {"from": gov})
     assert cloned_strategy.harvestTrigger(1) == True
-
     cloned_strategy.harvest({"from": strategist})
 
     # whale deposits as well
-    whale_deposit = 100_000 * (10 ** (decimals))
-    vault.deposit(whale_deposit, {"from": whale})
-    assert cloned_strategy.harvestTrigger(1000) == True
-    cloned_strategy.harvest({"from": strategist})
+    # whale_deposit = 100_000 * (10 ** (decimals))
+    # vault.deposit(whale_deposit, {"from": whale})
+    # assert cloned_strategy.harvestTrigger(1000) == True
+    # cloned_strategy.harvest({"from": strategist})
 
     for i in range(15):
         waitBlock = random.randint(10, 50)
@@ -71,7 +83,7 @@ def test_clone(chain, whale, gov, strategist, vault, strategy, hegic_cream_lende
             vault.deposit(depositAm, {"from": whale})
 
     # strategist withdraws
-    genericStateOfStrat(strategy, currency, vault)
+    genericStateOfStrat(cloned_strategy, currency, vault)
     genericStateOfVault(vault, currency)
     shareprice = vault.pricePerShare()
 
@@ -90,7 +102,7 @@ def test_clone(chain, whale, gov, strategist, vault, strategy, hegic_cream_lende
     balanceAfter = currency.balanceOf(strategist)
     print("shares", vault.balanceOf(strategist) / 1e18)
     print(balanceAfter / 1e18)
-    status = strategy.lendStatuses()
+    status = cloned_strategy.lendStatuses()
 
     chain.mine(waitBlock)
     withdrawn = balanceAfter - balanceBefore

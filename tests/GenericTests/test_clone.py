@@ -5,7 +5,7 @@ def test_clone(gov, vault, keeper, strategy, strategist, Strategy):
 
     # Do the regular add strategy with the regular one
     vault.setDepositLimit(Wei("1000000 ether"), {"from": gov})
-    vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 500, {"from": gov})
+    vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
 
     # Switch rewards with keeper to make sure the proxy worked
     tx = strategy.clone(vault, strategist, keeper, strategist)
