@@ -46,7 +46,7 @@ contract GenericCream is GenericLenderBase {
         want.safeApprove(_cToken, uint256(-1));
     }
 
-    function clone(
+    function cloneCreamLender(
         address _strategy,
         string memory _name,
         address _cToken

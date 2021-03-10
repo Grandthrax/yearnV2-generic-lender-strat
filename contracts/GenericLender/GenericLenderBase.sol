@@ -58,7 +58,7 @@ abstract contract GenericLenderBase is IGenericLender {
         _initialize(_strategy, _name);
     }
 
-    function _clone(address _strategy, string memory _name) internal returns (address newLender){
+    function _clone(address _strategy, string memory _name) internal returns (address newLender) {
         // Copied from https://github.com/optionality/clone-factory/blob/master/contracts/CloneFactory.sol
         bytes20 addressBytes = bytes20(address(this));
 
@@ -74,7 +74,6 @@ abstract contract GenericLenderBase is IGenericLender {
         GenericLenderBase(newLender).initialize(_strategy, _name);
         emit Cloned(newLender);
     }
-    
 
     function setDust(uint256 _dust) external virtual override management {
         dust = _dust;
