@@ -54,11 +54,11 @@ abstract contract GenericLenderBase is IGenericLender {
         want.safeApprove(_strategy, uint256(-1));
     }
 
-    function initialize(address _strategy, string memory _name) external {
+    function initialize(address _strategy, string memory _name) external virtual {
         _initialize(_strategy, _name);
     }
 
-    function clone(address _strategy, string memory _name) external returns (address newLender) {
+    function _clone(address _strategy, string memory _name) internal returns (address newLender) {
         // Copied from https://github.com/optionality/clone-factory/blob/master/contracts/CloneFactory.sol
         bytes20 addressBytes = bytes20(address(this));
 

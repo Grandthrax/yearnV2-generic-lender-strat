@@ -51,7 +51,7 @@ contract GenericCream is GenericLenderBase {
         string memory _name,
         address _cToken
     ) external returns (address newLender) {
-        newLender = this.clone(_strategy, _name);
+        newLender = _clone(_strategy, _name);
         GenericCream(newLender).initialize(_cToken);
     }
 
