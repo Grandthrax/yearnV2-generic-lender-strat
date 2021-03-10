@@ -32,11 +32,27 @@ contract GenericCream is GenericLenderBase {
         string memory name,
         address _cToken
     ) public GenericLenderBase(_strategy, name) {
+        _initialize(_cToken);
+    }
+
+    function initialize(address _cToken) external {
+        _initialize(_cToken);
+    }
+
+    function _initialize(address _cToken) internal {
+        require(address(cToken) == address(0), "GenericCream already initialized");
         cToken = CErc20I(_cToken);
-
         require(cToken.underlying() == address(want), "WRONG CTOKEN");
-
         want.safeApprove(_cToken, uint256(-1));
+    }
+
+    function cloneCreamLender(
+        address _strategy,
+        string memory _name,
+        address _cToken
+    ) external returns (address newLender) {
+        newLender = _clone(_strategy, _name);
+        GenericCream(newLender).initialize(_cToken);
     }
 
     function nav() external view override returns (uint256) {

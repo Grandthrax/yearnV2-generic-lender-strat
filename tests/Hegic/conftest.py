@@ -131,19 +131,7 @@ def vault(gov, rewards, guardian, currency, pm):
 
 
 @pytest.fixture
-def strategy(
-    strategist,
-    gov,
-    keeper,
-    vault,
-    crUsdc,
-    cUsdc,
-    crHegic,
-    Strategy,
-    GenericCompound,
-    GenericCream,
-    GenericDyDx,
-):
+def strategy(strategist, gov, keeper, vault, Strategy, GenericCream, crHegic):
     strategy = strategist.deploy(Strategy, vault)
     strategy.setKeeper(keeper)
 
