@@ -46,12 +46,12 @@ contract GenericCream is GenericLenderBase {
         want.safeApprove(_cToken, uint256(-1));
     }
 
-    function cloneCreamLender(
+    function clone(
         address _strategy,
         string memory _name,
         address _cToken
     ) external returns (address newLender) {
-        newLender = this.clone(_strategy, _name);
+        newLender = _clone(_strategy, _name);
         GenericCream(newLender).initialize(_cToken);
     }
 
