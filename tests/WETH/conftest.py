@@ -42,9 +42,11 @@ def live_strat_weth_2(Strategy):
 def live_strat_weth_031(Strategy):
     yield Strategy.at("0xac5DA2Ca938A7328dE563D7d7209370e24BFd21e")
 
+
 @pytest.fixture
 def live_strat_weth_032(Strategy):
     yield Strategy.at("0xeE697232DF2226c9fB3F02a57062c4208f287851")
+
 
 @pytest.fixture
 def live_vault_weth_2(pm):
@@ -63,10 +65,12 @@ def live_vault_weth_031(pm):
     Vault = pm(config["dependencies"][0]).Vault
     yield Vault.at("0xac333895ce1A73875CF7B4Ecdc5A743C12f3d82B")
 
+
 @pytest.fixture
 def live_vault_weth_032(pm):
     Vault = pm(config["dependencies"][0]).Vault
     yield Vault.at("0xa9fE4601811213c340e850ea305481afF02f5b28")
+
 
 @pytest.fixture
 def live_Alpha_Homo_2(AlphaHomo):
@@ -194,6 +198,7 @@ def cUsdc(interface):
 @pytest.fixture
 def crUsdc(interface):
     yield interface.CErc20I("0x44fbeBd2F576670a6C33f6Fc0B00aA8c5753b322")
+
 
 @pytest.fixture
 def aUsdc(interface):

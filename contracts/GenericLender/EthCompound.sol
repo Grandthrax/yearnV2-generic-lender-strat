@@ -111,7 +111,7 @@ contract EthCompound is GenericLenderBase {
 
             if (toWithdraw <= liquidity) {
                 //we can take all
-               crETH.redeemUnderlying(toWithdraw);
+                crETH.redeemUnderlying(toWithdraw);
             } else {
                 //take all we can
                 crETH.redeemUnderlying(liquidity);

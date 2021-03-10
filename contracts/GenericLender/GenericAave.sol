@@ -25,22 +25,37 @@ contract GenericAave is GenericLenderBase {
     using SafeERC20 for IERC20;
     using Address for address;
     using SafeMath for uint256;
-    
-    IProtocolDataProvider public immutable protocolDataProvider;
-    IAToken public immutable aToken;
+
+    IProtocolDataProvider public constant protocolDataProvider = IProtocolDataProvider(address(0x057835Ad21a177dbdd3090bB1CAE03EaCF78Fc6d));
+    IAToken public aToken;
 
     constructor(
         address _strategy,
         string memory name,
-        IProtocolDataProvider _protocolDataProvider,
         IAToken _aToken
     ) public GenericLenderBase(_strategy, name) {
-        protocolDataProvider = _protocolDataProvider;
+        _initialize(_aToken);
+    }
+
+    function initialize(IAToken _aToken) external {
+        _initialize(_aToken);
+    }
+
+    function _initialize(IAToken _aToken) internal {
+        require(address(aToken) == address(0), "GenericAave already initialized");
+
         aToken = _aToken;
+        require(_lendingPool().getReserveData(address(want)).aTokenAddress == address(_aToken), "WRONG ATOKEN");
+        want.approve(address(_lendingPool()), type(uint256).max);
+    }
 
-        require(ILendingPool(_protocolDataProvider.ADDRESSES_PROVIDER().getLendingPool()).getReserveData(address(want)).aTokenAddress == address(_aToken), "WRONG ATOKEN");
-
-        want.approve(address(_protocolDataProvider.ADDRESSES_PROVIDER().getLendingPool()), type(uint256).max);
+    function cloneAaveLender(
+        address _strategy,
+        string memory _name,
+        IAToken _aToken
+    ) external returns (address newLender) {
+        newLender = _clone(_strategy, _name);
+        GenericAave(newLender).initialize(_aToken);
     }
 
     function nav() external view override returns (uint256) {
@@ -60,7 +75,7 @@ contract GenericAave is GenericLenderBase {
     }
 
     function _apr() internal view returns (uint256) {
-        return uint(_lendingPool().getReserveData(address(want)).currentLiquidityRate).div(1e9); // dividing by 1e9 to pass from ray to wad
+        return uint256(_lendingPool().getReserveData(address(want)).currentLiquidityRate).div(1e9); // dividing by 1e9 to pass from ray to wad
     }
 
     function weightedApr() external view override returns (uint256) {
@@ -137,30 +152,22 @@ contract GenericAave is GenericLenderBase {
         // i need to calculate new supplyRate after Deposit (when deposit has not been done yet)
         DataTypes.ReserveData memory reserveData = _lendingPool().getReserveData(address(want));
 
-        (
-            uint availableLiquidity,
-            uint totalStableDebt,
-            uint totalVariableDebt,
-            ,
-            ,
-            ,
-            uint averageStableBorrowRate,
-            ,
-            ,
-            ) = protocolDataProvider.getReserveData(address(want));
+        (uint256 availableLiquidity, uint256 totalStableDebt, uint256 totalVariableDebt, , , , uint256 averageStableBorrowRate, , , ) =
+            protocolDataProvider.getReserveData(address(want));
 
-        uint newLiquidity = availableLiquidity.add(extraAmount);
+        uint256 newLiquidity = availableLiquidity.add(extraAmount);
 
-        (, , , , uint reserveFactor, , , , , ) = protocolDataProvider.getReserveConfigurationData(address(want));
+        (, , , , uint256 reserveFactor, , , , , ) = protocolDataProvider.getReserveConfigurationData(address(want));
 
-        (uint newLiquidityRate, , ) = IReserveInterestRateStrategy(reserveData.interestRateStrategyAddress).calculateInterestRates(
-            address(want),
-            newLiquidity,
-            totalStableDebt,
-            totalVariableDebt,
-            averageStableBorrowRate,
-            reserveFactor
-        );
+        (uint256 newLiquidityRate, , ) =
+            IReserveInterestRateStrategy(reserveData.interestRateStrategyAddress).calculateInterestRates(
+                address(want),
+                newLiquidity,
+                totalStableDebt,
+                totalVariableDebt,
+                averageStableBorrowRate,
+                reserveFactor
+            );
 
         return newLiquidityRate.div(1e9); // divided by 1e9 to go from Ray to Wad
     }

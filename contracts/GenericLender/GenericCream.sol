@@ -24,7 +24,6 @@ contract GenericCream is GenericLenderBase {
     using SafeMath for uint256;
 
     uint256 private constant blocksPerYear = 2_300_000;
-
     CErc20I public cToken;
 
     constructor(

@@ -4,6 +4,7 @@ from useful_methods import genericStateOfVault, genericStateOfStrat
 import random
 import brownie
 
+
 def test_manual_override(
     strategy, chain, vault, currency, interface, whale, strategist, gov, rando
 ):
@@ -17,7 +18,7 @@ def test_manual_override(
     currency.approve(vault, 2 ** 256 - 1, {"from": whale})
     currency.approve(vault, 2 ** 256 - 1, {"from": strategist})
 
-    vault.setDepositLimit(deposit_limit, {'from': gov})
+    vault.setDepositLimit(deposit_limit, {"from": gov})
     assert vault.depositLimit() > 0
 
     amount2 = 50_000 * (10 ** decimals)

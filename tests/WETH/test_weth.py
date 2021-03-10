@@ -134,7 +134,7 @@ def test_tend_trigger_weth(
     deposit_limit = 100_000_000 * 1e18
     debt_ratio = 10_000
     vault.addStrategy(strategy, debt_ratio, 0, 2 ** 256 - 1, 500, {"from": gov})
-    vault.setDepositLimit(deposit_limit, {'from': gov})
+    vault.setDepositLimit(deposit_limit, {"from": gov})
 
     whale_deposit = 1_000 * 1e18
     vault.deposit(whale_deposit, {"from": whale})
