@@ -5,7 +5,7 @@ import random
 import brownie
 
 
-def test_live_py(
+def xtest_live_py(
     currency,
     live_GenericCompound_usdc_1,
     live_GenericCream_usdc_1,

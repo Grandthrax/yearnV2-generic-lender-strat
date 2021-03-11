@@ -98,7 +98,7 @@ contract AlphaHomo is GenericLenderBase {
         uint256 ratePerSec = config.getInterestRate(b.glbDebtVal(), balance);
 
         //we scale up and down by 1e18 to keep precision
-        uint256 utilisation = uint256(1e18).mul(b.glbDebtVal()).div(b.totalETH());
+        uint256 utilisation = uint256(1e18).mul(b.glbDebtVal()).div(b.totalETH().add(amount));
         //10% is kept as reserves. So remove. Then multiply by utilisation to share per lender
         uint256 rate = ratePerSec.mul(9).div(10).mul(utilisation).div(1e18);
 

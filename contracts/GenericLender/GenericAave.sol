@@ -2,56 +2,60 @@
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
-import "../Interfaces/Compound/CErc20I.sol";
-import "../Interfaces/Compound/InterestRateModel.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
 import "./GenericLenderBase.sol";
+import "../Interfaces/Aave/IAToken.sol";
+import "../Interfaces/Aave/ILendingPool.sol";
+import "../Interfaces/Aave/IProtocolDataProvider.sol";
+import "../Interfaces/Aave/IReserveInterestRateStrategy.sol";
+import "../Libraries/Aave/DataTypes.sol";
 
 /********************
- *   A lender plugin for LenderYieldOptimiser for any erc20 asset on Cream (not eth)
+ *   A lender plugin for LenderYieldOptimiser for any erc20 asset on Aave (not eth)
  *   Made by SamPriestley.com
  *   https://github.com/Grandthrax/yearnv2/blob/master/contracts/GenericLender/GenericCream.sol
  *
  ********************* */
 
-contract GenericCream is GenericLenderBase {
+contract GenericAave is GenericLenderBase {
     using SafeERC20 for IERC20;
     using Address for address;
     using SafeMath for uint256;
 
-    uint256 private constant blocksPerYear = 2_300_000;
-    CErc20I public cToken;
+    IProtocolDataProvider public constant protocolDataProvider = IProtocolDataProvider(address(0x057835Ad21a177dbdd3090bB1CAE03EaCF78Fc6d));
+    IAToken public aToken;
 
     constructor(
         address _strategy,
         string memory name,
-        address _cToken
+        IAToken _aToken
     ) public GenericLenderBase(_strategy, name) {
-        _initialize(_cToken);
+        _initialize(_aToken);
     }
 
-    function initialize(address _cToken) external {
-        _initialize(_cToken);
+    function initialize(IAToken _aToken) external {
+        _initialize(_aToken);
     }
 
-    function _initialize(address _cToken) internal {
-        require(address(cToken) == address(0), "GenericCream already initialized");
-        cToken = CErc20I(_cToken);
-        require(cToken.underlying() == address(want), "WRONG CTOKEN");
-        want.safeApprove(_cToken, uint256(-1));
+    function _initialize(IAToken _aToken) internal {
+        require(address(aToken) == address(0), "GenericAave already initialized");
+
+        aToken = _aToken;
+        require(_lendingPool().getReserveData(address(want)).aTokenAddress == address(_aToken), "WRONG ATOKEN");
+        want.approve(address(_lendingPool()), type(uint256).max);
     }
 
-    function cloneCreamLender(
+    function cloneAaveLender(
         address _strategy,
         string memory _name,
-        address _cToken
+        IAToken _aToken
     ) external returns (address newLender) {
         newLender = _clone(_strategy, _name);
-        GenericCream(newLender).initialize(_cToken);
+        GenericAave(newLender).initialize(_aToken);
     }
 
     function nav() external view override returns (uint256) {
@@ -63,13 +67,7 @@ contract GenericCream is GenericLenderBase {
     }
 
     function underlyingBalanceStored() public view returns (uint256 balance) {
-        uint256 currentCr = cToken.balanceOf(address(this));
-        if (currentCr == 0) {
-            balance = 0;
-        } else {
-            //The current exchange rate as an unsigned integer, scaled by 1e18.
-            balance = currentCr.mul(cToken.exchangeRateStored()).div(1e18);
-        }
+        balance = aToken.balanceOf(address(this));
     }
 
     function apr() external view override returns (uint256) {
@@ -77,7 +75,7 @@ contract GenericCream is GenericLenderBase {
     }
 
     function _apr() internal view returns (uint256) {
-        return cToken.supplyRatePerBlock().mul(blocksPerYear);
+        return uint256(_lendingPool().getReserveData(address(want)).currentLiquidityRate).div(1e9); // dividing by 1e9 to pass from ray to wad
     }
 
     function weightedApr() external view override returns (uint256) {
@@ -91,15 +89,14 @@ contract GenericCream is GenericLenderBase {
 
     //emergency withdraw. sends balance plus amount to governance
     function emergencyWithdraw(uint256 amount) external override management {
-        //dont care about error here
-        cToken.redeemUnderlying(amount);
+        _lendingPool().withdraw(address(want), amount, address(this));
 
         want.safeTransfer(vault.governance(), want.balanceOf(address(this)));
     }
 
     //withdraw an amount including any want balance
     function _withdraw(uint256 amount) internal returns (uint256) {
-        uint256 balanceUnderlying = cToken.balanceOfUnderlying(address(this));
+        uint256 balanceUnderlying = aToken.balanceOf(address(this));
         uint256 looseBalance = want.balanceOf(address(this));
         uint256 total = balanceUnderlying.add(looseBalance);
 
@@ -107,23 +104,24 @@ contract GenericCream is GenericLenderBase {
             //cant withdraw more than we own
             amount = total;
         }
+
         if (looseBalance >= amount) {
             want.safeTransfer(address(strategy), amount);
             return amount;
         }
 
         //not state changing but OK because of previous call
-        uint256 liquidity = want.balanceOf(address(cToken));
+        uint256 liquidity = want.balanceOf(address(aToken));
 
         if (liquidity > 1) {
             uint256 toWithdraw = amount.sub(looseBalance);
 
             if (toWithdraw <= liquidity) {
                 //we can take all
-                require(cToken.redeemUnderlying(toWithdraw) == 0, "ctoken: redeemUnderlying fail");
+                _lendingPool().withdraw(address(want), toWithdraw, address(this));
             } else {
                 //take all we can
-                require(cToken.redeemUnderlying(liquidity) == 0, "ctoken: redeemUnderlying fail");
+                _lendingPool().withdraw(address(want), liquidity, address(this));
             }
         }
         looseBalance = want.balanceOf(address(this));
@@ -133,7 +131,7 @@ contract GenericCream is GenericLenderBase {
 
     function deposit() external override management {
         uint256 balance = want.balanceOf(address(this));
-        require(cToken.mint(balance) == 0, "ctoken: mint fail");
+        _lendingPool().deposit(address(want), balance, address(this), 7);
     }
 
     function withdrawAll() external override management returns (bool) {
@@ -143,28 +141,41 @@ contract GenericCream is GenericLenderBase {
     }
 
     function hasAssets() external view override returns (bool) {
-        return cToken.balanceOf(address(this)) > 0;
+        return aToken.balanceOf(address(this)) > 0;
     }
 
-    function aprAfterDeposit(uint256 amount) external view override returns (uint256) {
-        uint256 cashPrior = want.balanceOf(address(cToken));
+    function _lendingPool() internal view returns (ILendingPool lendingPool) {
+        lendingPool = ILendingPool(protocolDataProvider.ADDRESSES_PROVIDER().getLendingPool());
+    }
 
-        uint256 borrows = cToken.totalBorrows();
-        uint256 reserves = cToken.totalReserves();
+    function aprAfterDeposit(uint256 extraAmount) external view override returns (uint256) {
+        // i need to calculate new supplyRate after Deposit (when deposit has not been done yet)
+        DataTypes.ReserveData memory reserveData = _lendingPool().getReserveData(address(want));
 
-        uint256 reserverFactor = cToken.reserveFactorMantissa();
-        InterestRateModel model = cToken.interestRateModel();
+        (uint256 availableLiquidity, uint256 totalStableDebt, uint256 totalVariableDebt, , , , uint256 averageStableBorrowRate, , , ) =
+            protocolDataProvider.getReserveData(address(want));
 
-        //the supply rate is derived from the borrow rate, reserve factor and the amount of total borrows.
-        uint256 supplyRate = model.getSupplyRate(cashPrior.add(amount), borrows, reserves, reserverFactor);
+        uint256 newLiquidity = availableLiquidity.add(extraAmount);
 
-        return supplyRate.mul(blocksPerYear);
+        (, , , , uint256 reserveFactor, , , , , ) = protocolDataProvider.getReserveConfigurationData(address(want));
+
+        (uint256 newLiquidityRate, , ) =
+            IReserveInterestRateStrategy(reserveData.interestRateStrategyAddress).calculateInterestRates(
+                address(want),
+                newLiquidity,
+                totalStableDebt,
+                totalVariableDebt,
+                averageStableBorrowRate,
+                reserveFactor
+            );
+
+        return newLiquidityRate.div(1e9); // divided by 1e9 to go from Ray to Wad
     }
 
     function protectedTokens() internal view override returns (address[] memory) {
         address[] memory protected = new address[](2);
         protected[0] = address(want);
-        protected[1] = address(cToken);
+        protected[1] = address(aToken);
         return protected;
     }
 }

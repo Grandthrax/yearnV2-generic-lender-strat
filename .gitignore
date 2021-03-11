@@ -8,3 +8,4 @@ node_modules/
 @openzeppelin/
 .DS_Store
 .nvmrc
+.env

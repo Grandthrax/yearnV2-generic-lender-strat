@@ -12,11 +12,14 @@ def test_manual_override(
     decimals = currency.decimals()
 
     deposit_limit = 100_000_000 * (10 ** decimals)
-    vault.addStrategy(strategy, deposit_limit, 0, 2 ** 256 - 1, 500, {"from": gov})
+    vault.addStrategy(strategy, 9800, 0, 2 ** 256 - 1, 500, {"from": gov})
 
     amount1 = 50 * (10 ** decimals)
     currency.approve(vault, 2 ** 256 - 1, {"from": whale})
     currency.approve(vault, 2 ** 256 - 1, {"from": strategist})
+
+    vault.setDepositLimit(deposit_limit, {"from": gov})
+    assert vault.depositLimit() > 0
 
     amount2 = 50_000 * (10 ** decimals)
 

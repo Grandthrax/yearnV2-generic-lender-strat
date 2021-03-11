@@ -356,8 +356,8 @@ contract Strategy is BaseStrategyInitializable {
 
         if (total > debt) {
             _profit = total - debt;
-            uint256 amountToFree = _profit.add(_debtPayment);
 
+            uint256 amountToFree = _profit.add(_debtPayment);
             //we need to add outstanding to our profit
             //dont need to do logic if there is nothiing to free
             if (amountToFree > 0 && looseAssets < amountToFree) {
@@ -527,13 +527,11 @@ contract Strategy is BaseStrategyInitializable {
 
     function harvestTrigger(uint256 callCost) public view override returns (bool) {
         uint256 wantCallCost = _callCostToWant(callCost);
-
         return super.harvestTrigger(wantCallCost);
     }
 
     function ethToWant(uint256 _amount) internal view returns (uint256) {
         address[] memory path = new address[](2);
-        path = new address[](2);
         path[0] = weth;
         path[1] = address(want);
 
