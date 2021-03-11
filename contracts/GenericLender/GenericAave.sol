@@ -46,7 +46,7 @@ contract GenericAave is GenericLenderBase {
 
         aToken = _aToken;
         require(_lendingPool().getReserveData(address(want)).aTokenAddress == address(_aToken), "WRONG ATOKEN");
-        want.approve(address(_lendingPool()), type(uint256).max);
+        IERC20(address(want)).safeApprove(address(_lendingPool()), type(uint256).max);
     }
 
     function cloneAaveLender(

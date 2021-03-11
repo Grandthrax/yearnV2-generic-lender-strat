@@ -6,6 +6,9 @@ from brownie import Wei, config
 def live_strat_usdc_1(Strategy):
     yield Strategy.at("0xB7e9Bf9De45E1df822E97cA7E0C3D1B62798a4e0")
 
+@pytest.fixture
+def live_strat_weth_1(Strategy):
+    yield Strategy.at("0xeE697232DF2226c9fB3F02a57062c4208f287851")
 
 @pytest.fixture
 def live_vault_usdc(pm):
@@ -36,8 +39,8 @@ def live_GenericDyDx_usdc_1(GenericDyDx):
 
 # change these fixtures for generic tests
 @pytest.fixture
-def currency(dai, usdc, weth):
-    yield usdc
+def currency(dai, usdt, weth):
+    yield usdt
 
 
 @pytest.fixture(autouse=True)
@@ -48,9 +51,9 @@ def isolation(fn_isolation):
 @pytest.fixture
 def whale(accounts, web3, weth):
     # big binance7 wallet
-    # acc = accounts.at('0xBE0eB53F46cd790Cd13851d5EFf43D12404d33E8', force=True)
+    acc = accounts.at('0xBE0eB53F46cd790Cd13851d5EFf43D12404d33E8', force=True)
     # big binance8 wallet
-    acc = accounts.at("0xf977814e90da44bfa03b6295a0616a897441acec", force=True)
+    #acc = accounts.at("0xf977814e90da44bfa03b6295a0616a897441acec", force=True)
 
     # lots of weth account
     wethAcc = accounts.at("0x767Ecb395def19Ab8d1b2FCc89B3DDfBeD28fD6b", force=True)
@@ -72,11 +75,18 @@ def strategist(accounts, whale, currency):
 def samdev(accounts):
     yield accounts.at("0xC3D6880fD95E06C816cB030fAc45b3ffe3651Cb0", force=True)
 
+@pytest.fixture
+def stratms(accounts):
+    yield accounts.at("0x16388463d60FFE0661Cf7F1f31a7D658aC790ff7", force=True)
+
 
 @pytest.fixture
 def gov(accounts):
     yield accounts[3]
 
+@pytest.fixture
+def daddy(accounts):
+    yield accounts.at("0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52", force=True)
 
 @pytest.fixture
 def rewards(gov):
@@ -102,8 +112,8 @@ def rando(accounts):
 
 # specific addresses
 @pytest.fixture
-def usdc(interface):
-    yield interface.ERC20("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48")
+def usdt(interface):
+    yield interface.ERC20("0xdAC17F958D2ee523a2206206994597C13D831ec7")
 
 
 @pytest.fixture
@@ -116,24 +126,22 @@ def weth(interface):
     yield interface.IWETH("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2")
 
 
-@pytest.fixture
-def cdai(interface):
-    yield interface.CErc20I("0x5d3a536e4d6dbd6114cc1ead35777bab948e3643")
+
 
 
 @pytest.fixture
-def cUsdc(interface):
-    yield interface.CErc20I("0x39AA39c021dfbaE8faC545936693aC917d5E7563")
+def cUsdt(interface):
+    yield interface.CErc20I("0xf650C3d88D12dB855b8bf7D11Be6C55A4e07dCC9")
 
 
 @pytest.fixture
-def crUsdc(interface):
-    yield interface.CErc20I("0x44fbeBd2F576670a6C33f6Fc0B00aA8c5753b322")
+def crUsdt(interface):
+    yield interface.CErc20I("0x797AAB1ce7c01eB727ab980762bA88e7133d2157")
 
 
 @pytest.fixture
-def aUsdc(interface):
-    yield interface.CErc20I("0xBcca60bB61934080951369a648Fb03DF4F96263C")
+def aUsdt(interface):
+    yield interface.CErc20I("0x3Ed3B47Dd13EC9a98b44e6204A523E766B225811")
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -142,47 +150,59 @@ def shared_setup(module_isolation):
 
 
 @pytest.fixture
-def vault(gov, rewards, guardian, currency, pm):
-    Vault = pm(config["dependencies"][0]).Vault
-    vault = Vault.deploy({"from": guardian})
-    vault.initialize(currency, gov, rewards, "", "")
-    vault.setManagementFee(0, {"from": gov})
+def vault(gov, rewards, guardian, currency, pm, live_vault_usdt, stratms, daddy):
+    #Vault = pm(config["dependencies"][0]).Vault
+    #vault = Vault.deploy({"from": guardian})
+    #vault.initialize(currency, gov, rewards, "", "")
+    #vault.setManagementFee(0, {"from": gov})
+    #yield vault
+    vault = live_vault_usdt
+    vault.setGovernance(daddy, {'from': stratms})
+    vault.acceptGovernance({'from': daddy})
+
     yield vault
 
 
 @pytest.fixture
 def strategy(
     strategist,
-    gov,
+    live_strat_weth_1,
+    daddy,
     rewards,
     keeper,
+    currency,
     vault,
-    crUsdc,
-    cUsdc,
-    aUsdc,
+    crUsdt,
+    cUsdt,
+    aUsdt,
     Strategy,
     GenericCompound,
     GenericCream,
-    GenericDyDx,
     GenericAave,
 ):
-    strategy = strategist.deploy(Strategy, vault)
+    gov = daddy
+    tx = live_strat_weth_1.clone(vault, {"from": strategist})
+    strategy = Strategy.at(tx.return_value)
+
     strategy.setKeeper(keeper, {"from": gov})
     strategy.setWithdrawalThreshold(0, {"from": gov})
     strategy.setRewards(rewards, {"from": strategist})
+    assert vault.token() == currency
+    assert strategy.vault() == vault
 
-    compoundPlugin = strategist.deploy(GenericCompound, strategy, "Compound", cUsdc)
-    creamPlugin = strategist.deploy(GenericCream, strategy, "Cream", crUsdc)
-    dydxPlugin = strategist.deploy(GenericDyDx, strategy, "DyDx")
-    aavePlugin = strategist.deploy(GenericAave, strategy, "Aave", aUsdc)
+    compoundPlugin = strategist.deploy(GenericCompound, strategy, "Compound", cUsdt)
+    creamPlugin = strategist.deploy(GenericCream, strategy, "Cream", crUsdt)
+    aavePlugin = strategist.deploy(GenericAave, strategy, "Aave", aUsdt)
 
     strategy.addLender(creamPlugin, {"from": gov})
     assert strategy.numLenders() == 1
     strategy.addLender(compoundPlugin, {"from": gov})
     assert strategy.numLenders() == 2
-    strategy.addLender(dydxPlugin, {"from": gov})
-    assert strategy.numLenders() == 3
     strategy.addLender(aavePlugin, {"from": gov})
-    assert strategy.numLenders() == 4
+    assert strategy.numLenders() == 3
+
+    strategy.setDebtThreshold(1*1e18, {"from": gov})
+    strategy.setProfitFactor(1500, {"from": gov})
+    strategy.setMaxReportDelay(86000, {"from": gov})
 
     yield strategy
