@@ -61,9 +61,9 @@ def live_vault_weth_031(pm):
     yield Vault.at("0xac333895ce1A73875CF7B4Ecdc5A743C12f3d82B")
 
 @pytest.fixture
-def live_vault_dai_030(Contract):
+def live_vault_dai_030(Vault):
         
-    yield Contract.from_explorer("0x19D3364A399d251E894aC732651be8B0E4e85001")
+    yield Vault.at("0x19D3364A399d251E894aC732651be8B0E4e85001")
 
 @pytest.fixture
 def live_strat_dai_030(Strategy):

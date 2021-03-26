@@ -47,8 +47,8 @@ def test_030_live_dai(
     form = "{:.2%}"
     formS = "{:,.0f}"
 
-    #manualAll = [[dydxPlugin, 910], [creamPlugin, 90]]
-    #strategy.manualAllocation(manualAll, {"from": strategist})
+    manualAll = [[dydxPlugin, 0], [creamPlugin, 1000]]
+    strategy.manualAllocation(manualAll, {"from": strategist})
     #print("new alloc")
 
     status = strategy.lendStatuses()
@@ -89,24 +89,24 @@ def test_030_live_dai(
 
     #assert vault.debtRatio() == 9_900
     
-    strategy.harvest({"from": strategist})
+    #strategy.harvest({"from": strategist})
 
-    manualAll = [[dydxPlugin, 700], [creamPlugin, 300]]
-    strategy.manualAllocation(manualAll, {"from": strategist})
-    print("new alloc")
+    #manualAll = [[dydxPlugin, 700], [creamPlugin, 300]]
+    #strategy.manualAllocation(manualAll, {"from": strategist})
+    #print("new alloc")
 
-    genericStateOfStrat(strategy, currency, vault)
-    genericStateOfVault(vault, currency)
+    #genericStateOfStrat(strategy, currency, vault)
+    #genericStateOfVault(vault, currency)
 
     #form = "{:.2%}"
     #formS = "{:,.0f}"
 
-    status = strategy.lendStatuses()
+    #status = strategy.lendStatuses()
 
-    for j in status:
-        print(
-            f"Lender: {j[0]}, Deposits: {formS.format(j[1]/1e18)}, APR: {form.format(j[2]/1e18)}"
-        )
+    #for j in status:
+    #    print(
+    #        f"Lender: {j[0]}, Deposits: {formS.format(j[1]/1e18)}, APR: {form.format(j[2]/1e18)}"
+    #    )
     #chain.sleep(100)
     #chain.mine(1)
     
