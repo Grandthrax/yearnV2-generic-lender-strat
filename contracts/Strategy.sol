@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/math/Math.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
-import {BaseStrategyInitializable} from "@yearnvaults/contracts/BaseStrategy.sol";
+import {BaseStrategy} from "@yearnvaults/contracts/BaseStrategy.sol";
 
 import "./GenericLender/IGenericLender.sol";
 import "./WantToEthOracle/IWantToEth.sol";
@@ -28,7 +28,7 @@ interface IUni {
  *
  ********************* */
 
-contract Strategy is BaseStrategyInitializable {
+contract Strategy is BaseStrategy {
     using SafeERC20 for IERC20;
     using Address for address;
     using SafeMath for uint256;
@@ -44,7 +44,7 @@ contract Strategy is BaseStrategyInitializable {
 
     event Cloned(address indexed clone);
 
-    constructor(address _vault) public BaseStrategyInitializable(_vault) {
+    constructor(address _vault) public BaseStrategy(_vault) {
         debtThreshold = 100 * 1e18;
     }
 
@@ -70,9 +70,18 @@ contract Strategy is BaseStrategyInitializable {
             newStrategy := create(0, clone_code, 0x37)
         }
 
-        BaseStrategyInitializable(newStrategy).initialize(_vault, _strategist, _rewards, _keeper);
+        Strategy(newStrategy).initialize(_vault, _strategist, _rewards, _keeper);
 
         emit Cloned(newStrategy);
+    }
+
+    function initialize(
+        address _vault,
+        address _strategist,
+        address _rewards,
+        address _keeper
+    ) external virtual {
+        _initialize(_vault, _strategist, _rewards, _keeper);
     }
 
     function setWithdrawalThreshold(uint256 _threshold) external onlyAuthorized {
