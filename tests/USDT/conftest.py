@@ -11,6 +11,10 @@ def live_strat_weth_1(Strategy):
     yield Strategy.at("0xeE697232DF2226c9fB3F02a57062c4208f287851")
 
 @pytest.fixture
+def live_strat_usdt_1(Strategy):
+    yield Strategy.at("0x660F73c3C45ca124084a676D3635e5b015E99941")
+
+@pytest.fixture
 def live_vault_usdc(pm):
     Vault = pm(config["dependencies"][0]).Vault
     yield Vault.at("0xD6b53d0f3d4e55fbAaADc140C0B0488293a433f8")
@@ -18,7 +22,7 @@ def live_vault_usdc(pm):
 @pytest.fixture
 def live_vault_usdt(pm):
     Vault = pm(config["dependencies"][0]).Vault
-    vault = Vault.at('0xAf322a2eDf31490250fdEb0D712621484b09aBB6')
+    vault = Vault.at('0x32651dD149a6EC22734882F790cBEB21402663F9')
     yield vault
 
 
@@ -31,6 +35,13 @@ def live_GenericCompound_usdc_1(GenericCompound):
 def live_GenericCream_usdc_1(GenericCream):
     yield GenericCream.at("0x1bAaCef951d24c5d70a8cA88D89cE16B37472fB3")
 
+@pytest.fixture
+def live_GenericCream_aave_1(GenericCream):
+    yield GenericCream.at("0x2c1a28FB72dC1db8d7010009b234580feD13e944")
+    
+@pytest.fixture
+def live_GenericCream_usdt_1(GenericCream):
+    yield GenericCream.at("0xe18a775De318aa1274116036a9bB0Fe554Ab23D4")
 
 @pytest.fixture
 def live_GenericDyDx_usdc_1(GenericDyDx):
@@ -51,9 +62,9 @@ def isolation(fn_isolation):
 @pytest.fixture
 def whale(accounts, web3, weth):
     # big binance7 wallet
-    acc = accounts.at('0xBE0eB53F46cd790Cd13851d5EFf43D12404d33E8', force=True)
+    #acc = accounts.at('0xBE0eB53F46cd790Cd13851d5EFf43D12404d33E8', force=True)
     # big binance8 wallet
-    #acc = accounts.at("0xf977814e90da44bfa03b6295a0616a897441acec", force=True)
+    acc = accounts.at("0xf977814e90da44bfa03b6295a0616a897441acec", force=True)
 
     # lots of weth account
     wethAcc = accounts.at("0x767Ecb395def19Ab8d1b2FCc89B3DDfBeD28fD6b", force=True)
@@ -72,8 +83,11 @@ def strategist(accounts, whale, currency):
 
 
 @pytest.fixture
-def samdev(accounts):
-    yield accounts.at("0xC3D6880fD95E06C816cB030fAc45b3ffe3651Cb0", force=True)
+def samdev(accounts, whale, currency):
+    st = accounts.at("0xC3D6880fD95E06C816cB030fAc45b3ffe3651Cb0", force=True)
+    decimals = currency.decimals()
+    currency.transfer(st, 100_000 * (10 ** decimals), {"from": whale})
+    yield st
 
 @pytest.fixture
 def stratms(accounts):
@@ -157,8 +171,8 @@ def vault(gov, rewards, guardian, currency, pm, live_vault_usdt, stratms, daddy)
     #vault.setManagementFee(0, {"from": gov})
     #yield vault
     vault = live_vault_usdt
-    vault.setGovernance(daddy, {'from': stratms})
-    vault.acceptGovernance({'from': daddy})
+    #vault.setGovernance(daddy, {'from': stratms})
+    #vault.acceptGovernance({'from': daddy})
 
     yield vault
 
@@ -174,24 +188,33 @@ def strategy(
     vault,
     crUsdt,
     cUsdt,
-    aUsdt,
     Strategy,
+    live_strat_usdt_1,
+    live_GenericCream_aave_1,
+    live_GenericCream_usdt_1,
+    aUsdt,
     GenericCompound,
     GenericCream,
     GenericAave,
+    accounts
 ):
-    gov = daddy
+    gov = accounts.at(vault.governance(), force=True)
     tx = live_strat_weth_1.clone(vault, {"from": strategist})
-    strategy = Strategy.at(tx.return_value)
+    #strategy = Strategy.at(tx.return_value)
+    strategy = live_strat_usdt_1
+    strategist = accounts.at(strategy.strategist(), force=True)
+    strategy.setRewards(strategist, {"from": strategist})
 
-    strategy.setKeeper(keeper, {"from": gov})
+    
     strategy.setWithdrawalThreshold(0, {"from": gov})
-    strategy.setRewards(rewards, {"from": strategist})
-    assert vault.token() == currency
-    assert strategy.vault() == vault
 
     compoundPlugin = strategist.deploy(GenericCompound, strategy, "Compound", cUsdt)
-    creamPlugin = strategist.deploy(GenericCream, strategy, "Cream", crUsdt)
+
+    #tx = live_GenericCream_aave_1.cloneCreamLender(strategy,"Cream", crUsdt, {"from": strategist})
+    #creamPlugin = GenericCream.at(tx.return_value)
+    creamPlugin = live_GenericCream_usdt_1
+    #creamPlugin = strategist.deploy(GenericCream, strategy, "Cream", crUsdt)
+
     aavePlugin = strategist.deploy(GenericAave, strategy, "Aave", aUsdt)
 
     strategy.addLender(creamPlugin, {"from": gov})
@@ -201,7 +224,7 @@ def strategy(
     strategy.addLender(aavePlugin, {"from": gov})
     assert strategy.numLenders() == 3
 
-    strategy.setDebtThreshold(1*1e18, {"from": gov})
+    strategy.setDebtThreshold(1*1e6, {"from": gov})
     strategy.setProfitFactor(1500, {"from": gov})
     strategy.setMaxReportDelay(86000, {"from": gov})
 
