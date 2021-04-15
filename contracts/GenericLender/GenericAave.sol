@@ -17,7 +17,7 @@ import "../Libraries/Aave/DataTypes.sol";
 /********************
  *   A lender plugin for LenderYieldOptimiser for any erc20 asset on Aave
  *   Made by SamPriestley.com & jmonteer
- *   https://github.com/Grandthrax/yearnv2/blob/master/contracts/GenericLender/GenericAave.sol
+ *   https://github.com/Grandthrax/yearnV2-generic-lender-strat/blob/master/contracts/GenericLender/GenericAave.sol
  *
  ********************* */
 
