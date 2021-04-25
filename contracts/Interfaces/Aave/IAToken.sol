@@ -65,6 +65,8 @@ interface IAToken is IERC20, IScaledBalanceToken {
      */
     function mintToTreasury(uint256 amount, uint256 index) external;
 
+    function decimals() external view returns (uint256);
+
     /**
      * @dev Transfers aTokens in the event of a borrow being liquidated, in case the liquidators reclaims the aToken
      * @param from The address getting liquidated, current owner of the aTokens

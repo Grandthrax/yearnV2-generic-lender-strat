@@ -329,8 +329,8 @@ contract Strategy is BaseStrategy {
         return nav;
     }
 
-    //we need to free up profit plus _debtOutstanding.
-    //If _debtOutstanding is more than we can free we get as much as possible
+    // we need to free up profit plus _debtOutstanding.
+    // If _debtOutstanding is more than we can free we get as much as possible
     // should be no way for there to be a loss. we hope...
     function prepareReturn(uint256 _debtOutstanding)
         internal

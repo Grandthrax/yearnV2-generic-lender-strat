@@ -7,10 +7,14 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
+import "../Interfaces/UniswapInterfaces/IUniswapV2Router02.sol";
+
 import "./GenericLenderBase.sol";
 import "../Interfaces/Aave/IAToken.sol";
+import "../Interfaces/Aave/IStakedAave.sol";
 import "../Interfaces/Aave/ILendingPool.sol";
 import "../Interfaces/Aave/IProtocolDataProvider.sol";
+import "../Interfaces/Aave/IAaveIncentivesController.sol";
 import "../Interfaces/Aave/IReserveInterestRateStrategy.sol";
 import "../Libraries/Aave/DataTypes.sol";
 
@@ -28,6 +32,19 @@ contract GenericAave is GenericLenderBase {
 
     IProtocolDataProvider public constant protocolDataProvider = IProtocolDataProvider(address(0x057835Ad21a177dbdd3090bB1CAE03EaCF78Fc6d));
     IAToken public aToken;
+    IStakedAave public constant stkAave = IStakedAave(0x4da27a545c0c5B758a6BA100e3a049001de870f5);
+    IAaveIncentivesController public constant incentivesController = IAaveIncentivesController(0xd784927Ff2f95ba542BfC824c8a8a98F3495f6b5);
+
+    address public constant WETH =
+        address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+
+    address public constant AAVE =
+        address(0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9);
+
+    IUniswapV2Router02 public router =
+        IUniswapV2Router02(address(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D));
+
+    uint256 constant internal SECONDS_IN_YEAR = 365 days;
 
     constructor(
         address _strategy,
@@ -75,7 +92,12 @@ contract GenericAave is GenericLenderBase {
     }
 
     function _apr() internal view returns (uint256) {
-        return uint256(_lendingPool().getReserveData(address(want)).currentLiquidityRate).div(1e9); // dividing by 1e9 to pass from ray to wad
+        uint256 liquidityRate = uint256(_lendingPool().getReserveData(address(want)).currentLiquidityRate).div(1e9);// dividing by 1e9 to pass from ray to wad 
+        DataTypes.ReserveData memory reserveData = _lendingPool().getReserveData(address(want));
+        (uint256 availableLiquidity, , , , , , , , , ) = protocolDataProvider.getReserveData(address(want));
+
+        uint256 incentivesRate = _incentivesRate(aToken.balanceOf(address(this)), availableLiquidity);
+        return liquidityRate.div(1e9).add(incentivesRate); // divided by 1e9 to go from Ray to Wad
     }
 
     function weightedApr() external view override returns (uint256) {
@@ -131,16 +153,20 @@ contract GenericAave is GenericLenderBase {
 
     function deposit() external override management {
         uint256 balance = want.balanceOf(address(this));
+        _deposit(balance);
+    }
+
+    function _deposit(uint256 amount) internal {
         ILendingPool lp = _lendingPool();
         // NOTE: check if allowance is enough and acts accordingly
         // allowance might not be enough if 
         //     i) initial allowance has been used (should take years)
         //     ii) lendingPool contract address has changed (Aave updated the contract address)
-        if(want.allowance(address(this), address(lp)) < balance){
+        if(want.allowance(address(this), address(lp)) < amount){
             IERC20(address(want)).safeApprove(address(lp), type(uint256).max);
         }
 
-        lp.deposit(address(want), balance, address(this), 7);
+        lp.deposit(address(want), amount, address(this), 179);
     }
 
     function withdrawAll() external override management returns (bool) {
@@ -155,6 +181,102 @@ contract GenericAave is GenericLenderBase {
 
     function _lendingPool() internal view returns (ILendingPool lendingPool) {
         lendingPool = ILendingPool(protocolDataProvider.ADDRESSES_PROVIDER().getLendingPool());
+    }
+
+    function harvest() external {
+        if(_checkCooldown()) {
+            // redeem 
+            uint256 stkAaveBalance = IERC20(address(stkAave)).balanceOf(address(this));
+            if(stkAaveBalance > 0) {
+                stkAave.redeem(address(this), stkAaveBalance);
+            }
+
+            // sell AAVE for want
+            uint256 aaveBalance = IERC20(AAVE).balanceOf(address(this));
+            _sellAAVEForWant(aaveBalance);
+            
+            // deposit want
+            uint256 balance = want.balanceOf(address(this));
+            _deposit(balance);
+
+            // claim rewards
+            address[] memory assets = new address[](1);
+            assets[0] = address(want);
+            
+            uint256 pendingRewards = incentivesController.getRewardsBalance(assets, address(this));
+            if(pendingRewards > 0) {
+                incentivesController.claimRewards(assets, pendingRewards, address(this));
+            }
+
+            // cooldown
+            if(IERC20(address(stkAave)).balanceOf(address(this)) > 0) {
+                stkAave.cooldown();
+            }
+        }
+    }
+
+    function harvestTrigger() external view returns (bool) {
+        return _checkCooldown();
+    }
+
+    function _checkCooldown() internal view returns (bool) {
+        uint256 cooldownStartTimestamp = IStakedAave(stkAave).stakersCooldowns(address(this));
+        uint256 COOLDOWN_SECONDS = IStakedAave(stkAave).COOLDOWN_SECONDS();
+        uint256 UNSTAKE_WINDOW = IStakedAave(stkAave).UNSTAKE_WINDOW();
+        if(block.timestamp >= cooldownStartTimestamp.add(COOLDOWN_SECONDS)) {
+            return block.timestamp.sub(cooldownStartTimestamp.add(COOLDOWN_SECONDS)) <= UNSTAKE_WINDOW;
+        } else {
+            return false;
+        }
+    }
+
+    function _AAVEtoWant(uint256 _amount) internal view returns (uint256) {
+        if(_amount == 0) {
+            return 0;
+        }
+
+        address[] memory path;
+
+        if(address(want) == address(WETH)) {
+            path = new address[](2);
+            path[0] = address(AAVE);
+            path[1] = address(want);
+        } else {
+            path = new address[](3);
+            path[0] = address(AAVE);
+            path[1] = address(WETH);
+            path[2] = address(want);
+        }
+
+        uint256[] memory amounts = router.getAmountsOut(_amount, path);
+        return amounts[amounts.length - 1];
+    }
+
+    function _sellAAVEForWant(uint256 _amount) internal {
+        if (_amount == 0) {
+            return;
+        }
+
+        address[] memory path;
+
+        if(address(want) == address(WETH)) {
+            path = new address[](2);
+            path[0] = address(AAVE);
+            path[1] = address(want);
+        } else {
+            path = new address[](3);
+            path[0] = address(AAVE);
+            path[1] = address(WETH);
+            path[2] = address(want);
+        }
+
+        router.swapExactTokensForTokens(
+            _amount,
+            0,
+            path,
+            address(this),
+            now
+        );
     }
 
     function aprAfterDeposit(uint256 extraAmount) external view override returns (uint256) {
@@ -178,7 +300,28 @@ contract GenericAave is GenericLenderBase {
                 reserveFactor
             );
 
-        return newLiquidityRate.div(1e9); // divided by 1e9 to go from Ray to Wad
+        uint256 incentivesRate = _incentivesRate(aToken.balanceOf(address(this)).add(extraAmount), newLiquidity);
+        return newLiquidityRate.div(1e9).add(incentivesRate); // divided by 1e9 to go from Ray to Wad
+    }
+
+    function _incentivesRate(uint256 balance, uint256 liquidity) internal view returns (uint256) {
+        // incentives
+        if(block.timestamp < incentivesController.getDistributionEnd()) {
+            uint256 _emissionsPerSecond;
+            (, _emissionsPerSecond, ) = incentivesController.getAssetData(address(want));
+            if(_emissionsPerSecond > 0) {
+                uint256 emissionsInWant = _AAVEtoWant(_emissionsPerSecond);
+            
+                uint256 poolShare = balance.mul(10 ** aToken.decimals()).div(liquidity);
+
+                uint256 incentivesShare = emissionsInWant.mul(poolShare).div(10 ** aToken.decimals());
+
+                uint256 incentivesRate = incentivesShare.mul(SECONDS_IN_YEAR).mul(1e18).div(liquidity); // should be in 1e18
+
+                return incentivesRate.mul(9_500).div(10_000);
+            }
+        }
+        return 0;
     }
 
     function protectedTokens() internal view override returns (address[] memory) {
