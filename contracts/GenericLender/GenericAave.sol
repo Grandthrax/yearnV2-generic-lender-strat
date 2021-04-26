@@ -35,6 +35,8 @@ contract GenericAave is GenericLenderBase {
     IStakedAave public constant stkAave = IStakedAave(0x4da27a545c0c5B758a6BA100e3a049001de870f5);
 
     bool public isIncentivised;
+    uint256 internal constant DEFAULT_REFERRAL = 179; // jmonteer's referral code
+    uint256 internal customReferral;
 
     address public constant WETH =
         address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
@@ -72,10 +74,16 @@ contract GenericAave is GenericLenderBase {
 
     // for the management to activate / deactivate incentives functionality
     function setIsIncentivised(bool _isIncentivised) external management {
-        require(address(aToken.getIncentivesController()) != address(0), "!aToken does not have incentives controller set up");
+        // NOTE: if the aToken is not incentivised, getIncentivesController() might revert (aToken won't implement it)
+        // to avoid calling it, we use the OR and lazy evaluation
+        require(!_isIncentivised || address(aToken.getIncentivesController()) != address(0), "!aToken does not have incentives controller set up");
         isIncentivised = _isIncentivised;
     }
 
+    function setReferralCode(uint256 _customReferral) external management {
+        require(_customReferral != 0, "!invalid referral code");
+        customReferral = _customReferral;
+    }
 
     function withdraw(uint256 amount) external override management returns (uint256) {
         return _withdraw(amount);
@@ -97,6 +105,11 @@ contract GenericAave is GenericLenderBase {
         uint256 invested = _nav();
         uint256 returned = _withdraw(invested);
         return returned >= invested;
+    }
+
+    function startCooldown() external management {
+        // for emergency cases
+        IStakedAave(stkAave).cooldown(); // it will revert if balance of stkAave == 0
     }
 
     function nav() external view override returns (uint256) {
@@ -166,36 +179,35 @@ contract GenericAave is GenericLenderBase {
     // Only for incentivised aTokens
     // this is a manual trigger to claim rewards once each 10 days
     // only callable if the token is incentivised by Aave Governance (_checkCooldown returns true)
-    function harvest() external {
-        if(_checkCooldown()) {
-            // redeem AAVE from stkAave
-            uint256 stkAaveBalance = IERC20(address(stkAave)).balanceOf(address(this));
-            if(stkAaveBalance > 0) {
-                stkAave.redeem(address(this), stkAaveBalance);
-            }
+    function harvest() external management{
+        require(_checkCooldown(), "!conditions are not met");
+        // redeem AAVE from stkAave
+        uint256 stkAaveBalance = IERC20(address(stkAave)).balanceOf(address(this));
+        if(stkAaveBalance > 0) {
+            stkAave.redeem(address(this), stkAaveBalance);
+        }
 
-            // sell AAVE for want
-            uint256 aaveBalance = IERC20(AAVE).balanceOf(address(this));
-            _sellAAVEForWant(aaveBalance);
-            
-            // deposit want in lending protocol 
-            uint256 balance = want.balanceOf(address(this));
-            if(balance > 0) {
-                _deposit(balance);
-            }
+        // sell AAVE for want
+        uint256 aaveBalance = IERC20(AAVE).balanceOf(address(this));
+        _sellAAVEForWant(aaveBalance);
+        
+        // deposit want in lending protocol 
+        uint256 balance = want.balanceOf(address(this));
+        if(balance > 0) {
+            _deposit(balance);
+        }
 
-            // claim rewards
-            address[] memory assets = new address[](1);
-            assets[0] = address(aToken);
-            uint256 pendingRewards = _incentivesController().getRewardsBalance(assets, address(this));
-            if(pendingRewards > 0) {
-                _incentivesController().claimRewards(assets, pendingRewards, address(this));
-            }
+        // claim rewards
+        address[] memory assets = new address[](1);
+        assets[0] = address(aToken);
+        uint256 pendingRewards = _incentivesController().getRewardsBalance(assets, address(this));
+        if(pendingRewards > 0) {
+            _incentivesController().claimRewards(assets, pendingRewards, address(this));
+        }
 
-            // request start of cooldown period
-            if(IERC20(address(stkAave)).balanceOf(address(this)) > 0) {
-                stkAave.cooldown();
-            }
+        // request start of cooldown period
+        if(IERC20(address(stkAave)).balanceOf(address(this)) > 0) {
+            stkAave.cooldown();
         }
     }
 
@@ -205,7 +217,8 @@ contract GenericAave is GenericLenderBase {
 
     function _initialize(IAToken _aToken, bool _isIncentivised) internal {
         require(address(aToken) == address(0), "GenericAave already initialized");
-    
+        
+        require(!_isIncentivised || address(_aToken.getIncentivesController()) != address(0), "!aToken does not have incentives controller set up");
         isIncentivised = _isIncentivised;
         aToken = _aToken;
         require(_lendingPool().getReserveData(address(want)).aTokenAddress == address(_aToken), "WRONG ATOKEN");
@@ -270,7 +283,15 @@ contract GenericAave is GenericLenderBase {
             IERC20(address(want)).safeApprove(address(lp), type(uint256).max);
         }
 
-        lp.deposit(address(want), amount, address(this), 179);
+        uint256 referral;
+        uint256 _customReferral = customReferral;
+        if(_customReferral != 0) {
+            referral = _customReferral;
+        } else {
+            referral = DEFAULT_REFERRAL;
+        }
+
+        lp.deposit(address(want), amount, address(this), referral);
     }
 
     function _lendingPool() internal view returns (ILendingPool lendingPool) {
