@@ -34,6 +34,8 @@ contract GenericAave is GenericLenderBase {
     IAToken public aToken;
     IStakedAave public constant stkAave = IStakedAave(0x4da27a545c0c5B758a6BA100e3a049001de870f5);
 
+    address public keep3r;
+
     bool public isIncentivised;
     uint16 internal constant DEFAULT_REFERRAL = 179; // jmonteer's referral code
     uint16 internal customReferral;
@@ -83,6 +85,10 @@ contract GenericAave is GenericLenderBase {
     function setReferralCode(uint16 _customReferral) external management {
         require(_customReferral != 0, "!invalid referral code");
         customReferral = _customReferral;
+    }
+
+    function setKeep3r(address _keep3r) external management {
+        keep3r = _keep3r;
     }
 
     function withdraw(uint256 amount) external override management returns (uint256) {
@@ -179,7 +185,7 @@ contract GenericAave is GenericLenderBase {
     // Only for incentivised aTokens
     // this is a manual trigger to claim rewards once each 10 days
     // only callable if the token is incentivised by Aave Governance (_checkCooldown returns true)
-    function harvest() external management{
+    function harvest() external keepers{
         require(_checkCooldown(), "!conditions are not met");
         // redeem AAVE from stkAave
         uint256 stkAaveBalance = IERC20(address(stkAave)).balanceOf(address(this));
@@ -380,5 +386,13 @@ contract GenericAave is GenericLenderBase {
         protected[0] = address(want);
         protected[1] = address(aToken);
         return protected;
+    }
+
+    modifier keepers() {
+        require(
+            msg.sender == address(keep3r) || msg.sender == address(strategy) || msg.sender == vault.governance() || msg.sender == IBaseStrategy(strategy).strategist(),
+            "!keepers"
+        );
+        _;
     }
 }

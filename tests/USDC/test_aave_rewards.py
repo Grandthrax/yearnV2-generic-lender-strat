@@ -81,19 +81,24 @@ def test_aave_rewards(chain,
 
     assert cloned_strategy.harvestTrigger(1) == False
     
-    assert cloned_lender.harvestTrigger() == True # first harvest
+    assert cloned_lender.harvestTrigger(1) == True # first harvest
     
     with brownie.reverts():## should fail for any non-management account
         cloned_lender.harvest({'from': whale})
-        
-    cloned_lender.harvest({'from': strategist})
 
-    assert cloned_lender.harvestTrigger() == False
+    with brownie.reverts(): ## not in management so should revert
+        cloned_lender.setKeep3r(whale, {'from': whale})
+
+    cloned_lender.setKeep3r(whale, {'from': strategist})
+
+    cloned_lender.harvest({'from': whale})
+
+    assert cloned_lender.harvestTrigger(1) == False
 
     chain.sleep(10*3600*24+1) # we wait 10 days for the cooldown period 
     chain.mine(1)
 
-    assert cloned_lender.harvestTrigger() == True
+    assert cloned_lender.harvestTrigger(1) == True
     assert incentives_controller.getRewardsBalance([aUsdc], cloned_lender) > 0
     previousBalance = aUsdc.balanceOf(cloned_lender)
     
@@ -197,17 +202,17 @@ def test_no_emissions(
 
     assert cloned_strategy.harvestTrigger(1) == False
     
-    assert cloned_lender.harvestTrigger() == False # harvest is unavailable
+    assert cloned_lender.harvestTrigger(1) == False # harvest is unavailable
     
     with brownie.reverts():
         cloned_lender.harvest({'from': strategist}) # if called, it does not revert
 
-    assert cloned_lender.harvestTrigger() == False
+    assert cloned_lender.harvestTrigger(1) == False
 
     chain.sleep(10*3600*24+1) # we wait 10 days for the cooldown period 
     chain.mine(1)
 
-    assert cloned_lender.harvestTrigger() == False # always unavailable
+    assert cloned_lender.harvestTrigger(1) == False # always unavailable
 
     cloned_strategy.harvest({'from': strategist})
     chain.sleep(6*3600)
