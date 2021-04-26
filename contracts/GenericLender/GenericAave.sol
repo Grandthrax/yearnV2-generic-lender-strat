@@ -231,7 +231,6 @@ contract GenericAave is GenericLenderBase {
 
     function _apr() internal view returns (uint256) {
         uint256 liquidityRate = uint256(_lendingPool().getReserveData(address(want)).currentLiquidityRate).div(1e9);// dividing by 1e9 to pass from ray to wad 
-        DataTypes.ReserveData memory reserveData = _lendingPool().getReserveData(address(want));
         (uint256 availableLiquidity, uint256 totalStableDebt, uint256 totalVariableDebt, , , , , , , ) =
                     protocolDataProvider.getReserveData(address(want));
         uint256 incentivesRate = _incentivesRate(availableLiquidity.add(totalStableDebt).add(totalVariableDebt)); // total supplied liquidity in Aave v2
