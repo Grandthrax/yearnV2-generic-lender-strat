@@ -132,7 +132,7 @@ def crUsdc(interface):
 
 @pytest.fixture
 def aUsdc(interface):
-    yield interface.CErc20I("0xBcca60bB61934080951369a648Fb03DF4F96263C")
+    yield interface.IAToken("0xBcca60bB61934080951369a648Fb03DF4F96263C")
 
 
 @pytest.fixture(scope="module", autouse=True)

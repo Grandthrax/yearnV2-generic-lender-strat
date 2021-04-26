@@ -4,7 +4,6 @@ from useful_methods import genericStateOfVault, genericStateOfStrat
 import random
 import brownie
 
-
 def test_aave_clone(
     chain,
     usdc,
@@ -18,7 +17,6 @@ def test_aave_clone(
     GenericAave,
     aUsdc,
 ):
-
     # Clone magic
     tx = strategy.clone(vault)
     cloned_strategy = Strategy.at(tx.return_value)

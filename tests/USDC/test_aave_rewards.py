@@ -31,7 +31,7 @@ def test_aave_rewards(chain,
     # Clone the aave lender
     original_aave = GenericAave.at(strategy.lenders(strategy.numLenders() - 1))
     tx = original_aave.cloneAaveLender(
-        cloned_strategy, "ClonedAaveUSDC", aUsdc, True, {"from": gov}
+        cloned_strategy, "ClonedAaveUSDC", aUsdc, False, {"from": gov}
     )
     cloned_lender = GenericAave.at(tx.return_value)
     assert cloned_lender.lenderName() == "ClonedAaveUSDC"
@@ -52,7 +52,6 @@ def test_aave_rewards(chain,
     assert deposit_limit == vault.depositLimit()
 
     # ------------------ set up proposal ------------------
-    incentives_controller = Contract(cloned_lender.incentivesController())
 
     chain.sleep(12 * 3600) # to be able to execute
     chain.mine(1)
@@ -60,8 +59,12 @@ def test_aave_rewards(chain,
     executor = Contract.from_abi("AaveGovernanceV2", "0xec568fffba86c094cf06b22134b23074dfe2252c", executor_abi, owner="0x30fe242a69d7694a931791429815db792e24cf97")
     tx = executor.execute(11)
 
+    incentives_controller = Contract(aUsdc.getIncentivesController())
     assert incentives_controller.getDistributionEnd() > 0
     # ------------------ test starts ------------------
+    # turning on claiming incentives logic
+    cloned_lender.setIsIncentivised(True, {'from': strategist})
+
     # our humble strategist deposits some test funds
     depositAmount = 50000 * (10 ** (decimals))
     vault.deposit(depositAmount, {"from": strategist})
@@ -162,7 +165,19 @@ def test_no_emissions(
     vault.setDepositLimit(deposit_limit, {"from": vault.governance()})
 
     assert deposit_limit == vault.depositLimit()
+    with brownie.reverts():
+        cloned_lender.setIsIncentivised(True, {'from': strategist})
+    # ------------------ set up proposal ------------------
 
+    chain.sleep(12 * 3600) # to be able to execute
+    chain.mine(1)
+    print("executing proposal 11") # to be able to test before the proposal is executed
+    executor = Contract.from_abi("AaveGovernanceV2", "0xec568fffba86c094cf06b22134b23074dfe2252c", executor_abi, owner="0x30fe242a69d7694a931791429815db792e24cf97")
+    tx = executor.execute(11)
+
+    # should fail because sUSD is not incentivised
+    with brownie.reverts():
+        cloned_lender.setIsIncentivised(True, {'from': strategist})
 # our humble strategist deposits some test funds
     depositAmount = 50 * (10 ** (decimals))
     vault.deposit(depositAmount, {"from": strategist})

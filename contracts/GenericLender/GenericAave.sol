@@ -33,7 +33,6 @@ contract GenericAave is GenericLenderBase {
     IProtocolDataProvider public constant protocolDataProvider = IProtocolDataProvider(address(0x057835Ad21a177dbdd3090bB1CAE03EaCF78Fc6d));
     IAToken public aToken;
     IStakedAave public constant stkAave = IStakedAave(0x4da27a545c0c5B758a6BA100e3a049001de870f5);
-    IAaveIncentivesController public constant incentivesController = IAaveIncentivesController(0xd784927Ff2f95ba542BfC824c8a8a98F3495f6b5);
 
     bool public isIncentivised;
 
@@ -229,7 +228,7 @@ contract GenericAave is GenericLenderBase {
         if(!isIncentivised) {
             return false;
         }
-        
+
         uint256 cooldownStartTimestamp = IStakedAave(stkAave).stakersCooldowns(address(this));
         uint256 COOLDOWN_SECONDS = IStakedAave(stkAave).COOLDOWN_SECONDS();
         uint256 UNSTAKE_WINDOW = IStakedAave(stkAave).UNSTAKE_WINDOW();
@@ -339,6 +338,7 @@ contract GenericAave is GenericLenderBase {
 
     // for the management to activate / deactivate incentives functionality
     function setIsIncentivised(bool _isIncentivised) external management {
+        require(address(aToken.getIncentivesController()) != address(0), "!aToken does not have incentives controller set up");
         isIncentivised = _isIncentivised;
     }
 
