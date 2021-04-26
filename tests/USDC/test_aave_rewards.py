@@ -82,7 +82,10 @@ def test_aave_rewards(chain,
     assert cloned_strategy.harvestTrigger(1) == False
     
     assert cloned_lender.harvestTrigger() == True # first harvest
-
+    
+    with brownie.reverts():## should fail for any non-management account
+        cloned_lender.harvest({'from': whale})
+        
     cloned_lender.harvest({'from': strategist})
 
     assert cloned_lender.harvestTrigger() == False

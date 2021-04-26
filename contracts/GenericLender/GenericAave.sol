@@ -280,6 +280,7 @@ contract GenericAave is GenericLenderBase {
         //     i) initial allowance has been used (should take years)
         //     ii) lendingPool contract address has changed (Aave updated the contract address)
         if(want.allowance(address(this), address(lp)) < amount){
+            IERC20(address(want)).safeApprove(address(lp), 0);
             IERC20(address(want)).safeApprove(address(lp), type(uint256).max);
         }
 

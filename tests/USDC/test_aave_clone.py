@@ -38,6 +38,10 @@ def test_aave_clone(
     assert cloned_lender.lenderName() == "ClonedAaveUSDC"
 
     cloned_strategy.addLender(cloned_lender, {"from": gov})
+    
+    with brownie.reverts():
+        cloned_lender.initialize['address,bool'](aUsdc, False, {'from': gov})
+
     starting_balance = usdc.balanceOf(strategist)
     currency = usdc
     decimals = currency.decimals()
