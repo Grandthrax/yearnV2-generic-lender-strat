@@ -211,7 +211,7 @@ contract GenericAave is GenericLenderBase {
         }
     }
 
-    function harvestTrigger() external view returns (bool) {
+    function harvestTrigger(uint256 callcost) external view returns (bool) {
         return _checkCooldown();
     }
 
