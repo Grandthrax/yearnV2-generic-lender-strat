@@ -35,8 +35,8 @@ contract GenericAave is GenericLenderBase {
     IStakedAave public constant stkAave = IStakedAave(0x4da27a545c0c5B758a6BA100e3a049001de870f5);
 
     bool public isIncentivised;
-    uint256 internal constant DEFAULT_REFERRAL = 179; // jmonteer's referral code
-    uint256 internal customReferral;
+    uint16 internal constant DEFAULT_REFERRAL = 179; // jmonteer's referral code
+    uint16 internal customReferral;
 
     address public constant WETH =
         address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
@@ -80,7 +80,7 @@ contract GenericAave is GenericLenderBase {
         isIncentivised = _isIncentivised;
     }
 
-    function setReferralCode(uint256 _customReferral) external management {
+    function setReferralCode(uint16 _customReferral) external management {
         require(_customReferral != 0, "!invalid referral code");
         customReferral = _customReferral;
     }
@@ -217,7 +217,7 @@ contract GenericAave is GenericLenderBase {
 
     function _initialize(IAToken _aToken, bool _isIncentivised) internal {
         require(address(aToken) == address(0), "GenericAave already initialized");
-        
+
         require(!_isIncentivised || address(_aToken.getIncentivesController()) != address(0), "!aToken does not have incentives controller set up");
         isIncentivised = _isIncentivised;
         aToken = _aToken;
@@ -283,8 +283,8 @@ contract GenericAave is GenericLenderBase {
             IERC20(address(want)).safeApprove(address(lp), type(uint256).max);
         }
 
-        uint256 referral;
-        uint256 _customReferral = customReferral;
+        uint16 referral;
+        uint16 _customReferral = customReferral;
         if(_customReferral != 0) {
             referral = _customReferral;
         } else {
