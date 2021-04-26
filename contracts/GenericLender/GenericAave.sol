@@ -35,13 +35,15 @@ contract GenericAave is GenericLenderBase {
     IStakedAave public constant stkAave = IStakedAave(0x4da27a545c0c5B758a6BA100e3a049001de870f5);
     IAaveIncentivesController public constant incentivesController = IAaveIncentivesController(0xd784927Ff2f95ba542BfC824c8a8a98F3495f6b5);
 
+    bool public isIncentivised;
+
     address public constant WETH =
         address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
 
     address public constant AAVE =
         address(0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9);
 
-    IUniswapV2Router02 public router =
+    IUniswapV2Router02 public constant router =
         IUniswapV2Router02(address(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D));
 
     uint256 constant internal SECONDS_IN_YEAR = 365 days;
@@ -49,18 +51,20 @@ contract GenericAave is GenericLenderBase {
     constructor(
         address _strategy,
         string memory name,
-        IAToken _aToken
+        IAToken _aToken,
+        bool _isIncentivised
     ) public GenericLenderBase(_strategy, name) {
-        _initialize(_aToken);
+        _initialize(_aToken, _isIncentivised);
     }
 
-    function initialize(IAToken _aToken) external {
-        _initialize(_aToken);
+    function initialize(IAToken _aToken, bool _isIncentivised) external {
+        _initialize(_aToken, _isIncentivised);
     }
 
-    function _initialize(IAToken _aToken) internal {
+    function _initialize(IAToken _aToken, bool _isIncentivised) internal {
         require(address(aToken) == address(0), "GenericAave already initialized");
-
+    
+        isIncentivised = _isIncentivised;
         aToken = _aToken;
         require(_lendingPool().getReserveData(address(want)).aTokenAddress == address(_aToken), "WRONG ATOKEN");
         IERC20(address(want)).safeApprove(address(_lendingPool()), type(uint256).max);
@@ -69,10 +73,11 @@ contract GenericAave is GenericLenderBase {
     function cloneAaveLender(
         address _strategy,
         string memory _name,
-        IAToken _aToken
+        IAToken _aToken,
+        bool _isIncentivised
     ) external returns (address newLender) {
         newLender = _clone(_strategy, _name);
-        GenericAave(newLender).initialize(_aToken);
+        GenericAave(newLender).initialize(_aToken, _isIncentivised);
     }
 
     function nav() external view override returns (uint256) {
@@ -94,10 +99,10 @@ contract GenericAave is GenericLenderBase {
     function _apr() internal view returns (uint256) {
         uint256 liquidityRate = uint256(_lendingPool().getReserveData(address(want)).currentLiquidityRate).div(1e9);// dividing by 1e9 to pass from ray to wad 
         DataTypes.ReserveData memory reserveData = _lendingPool().getReserveData(address(want));
-        (uint256 availableLiquidity, , , , , , , , , ) = protocolDataProvider.getReserveData(address(want));
-
-        uint256 incentivesRate = _incentivesRate(aToken.balanceOf(address(this)), availableLiquidity);
-        return liquidityRate.div(1e9).add(incentivesRate); // divided by 1e9 to go from Ray to Wad
+        (uint256 availableLiquidity, uint256 totalStableDebt, uint256 totalVariableDebt, , , , , , , ) =
+                    protocolDataProvider.getReserveData(address(want));
+        uint256 incentivesRate = _incentivesRate(availableLiquidity.add(totalStableDebt).add(totalVariableDebt)); // total supplied liquidity in Aave v2
+        return liquidityRate.add(incentivesRate);
     }
 
     function weightedApr() external view override returns (uint256) {
@@ -185,7 +190,7 @@ contract GenericAave is GenericLenderBase {
 
     function harvest() external {
         if(_checkCooldown()) {
-            // redeem 
+            // redeem AAVE from stkAave
             uint256 stkAaveBalance = IERC20(address(stkAave)).balanceOf(address(this));
             if(stkAaveBalance > 0) {
                 stkAave.redeem(address(this), stkAaveBalance);
@@ -195,20 +200,21 @@ contract GenericAave is GenericLenderBase {
             uint256 aaveBalance = IERC20(AAVE).balanceOf(address(this));
             _sellAAVEForWant(aaveBalance);
             
-            // deposit want
+            // deposit want in lending protocol 
             uint256 balance = want.balanceOf(address(this));
-            _deposit(balance);
+            if(balance > 0) {
+                _deposit(balance);
+            }
 
             // claim rewards
             address[] memory assets = new address[](1);
-            assets[0] = address(want);
-            
-            uint256 pendingRewards = incentivesController.getRewardsBalance(assets, address(this));
+            assets[0] = address(aToken);
+            uint256 pendingRewards = _incentivesController().getRewardsBalance(assets, address(this));
             if(pendingRewards > 0) {
-                incentivesController.claimRewards(assets, pendingRewards, address(this));
+                _incentivesController().claimRewards(assets, pendingRewards, address(this));
             }
 
-            // cooldown
+            // request start of cooldown period
             if(IERC20(address(stkAave)).balanceOf(address(this)) > 0) {
                 stkAave.cooldown();
             }
@@ -220,17 +226,21 @@ contract GenericAave is GenericLenderBase {
     }
 
     function _checkCooldown() internal view returns (bool) {
+        if(!isIncentivised) {
+            return false;
+        }
+        
         uint256 cooldownStartTimestamp = IStakedAave(stkAave).stakersCooldowns(address(this));
         uint256 COOLDOWN_SECONDS = IStakedAave(stkAave).COOLDOWN_SECONDS();
         uint256 UNSTAKE_WINDOW = IStakedAave(stkAave).UNSTAKE_WINDOW();
         if(block.timestamp >= cooldownStartTimestamp.add(COOLDOWN_SECONDS)) {
-            return block.timestamp.sub(cooldownStartTimestamp.add(COOLDOWN_SECONDS)) <= UNSTAKE_WINDOW;
+            return block.timestamp.sub(cooldownStartTimestamp.add(COOLDOWN_SECONDS)) <= UNSTAKE_WINDOW || cooldownStartTimestamp == 0;
         } else {
             return false;
         }
     }
 
-    function _AAVEtoWant(uint256 _amount) internal view returns (uint256) {
+    function _AAVEtoWant(uint256 _amount) public view returns (uint256) {
         if(_amount == 0) {
             return 0;
         }
@@ -270,6 +280,11 @@ contract GenericAave is GenericLenderBase {
             path[2] = address(want);
         }
 
+        if(IERC20(AAVE).allowance(address(this), address(router)) < _amount) {
+            IERC20(AAVE).safeApprove(address(router), 0);
+            IERC20(AAVE).safeApprove(address(router), type(uint256).max);
+        }
+
         router.swapExactTokensForTokens(
             _amount,
             0,
@@ -300,28 +315,39 @@ contract GenericAave is GenericLenderBase {
                 reserveFactor
             );
 
-        uint256 incentivesRate = _incentivesRate(aToken.balanceOf(address(this)).add(extraAmount), newLiquidity);
+        uint256 incentivesRate = _incentivesRate(newLiquidity.add(totalStableDebt).add(totalVariableDebt)); // total supplied liquidity in Aave v2
         return newLiquidityRate.div(1e9).add(incentivesRate); // divided by 1e9 to go from Ray to Wad
     }
 
-    function _incentivesRate(uint256 balance, uint256 liquidity) internal view returns (uint256) {
-        // incentives
-        if(block.timestamp < incentivesController.getDistributionEnd()) {
+    // calculates APR from Liquidity Mining Program 
+    function _incentivesRate(uint256 totalLiquidity) public view returns (uint256) {
+        // only returns != 0 if the incentives are in place at the moment. 
+        // it will fail if the isIncentivised is set to true but there is no incentives
+        if(isIncentivised && block.timestamp < _incentivesController().getDistributionEnd()) {
             uint256 _emissionsPerSecond;
-            (, _emissionsPerSecond, ) = incentivesController.getAssetData(address(want));
+            (, _emissionsPerSecond, ) = _incentivesController().getAssetData(address(aToken));
             if(_emissionsPerSecond > 0) {
-                uint256 emissionsInWant = _AAVEtoWant(_emissionsPerSecond);
-            
-                uint256 poolShare = balance.mul(10 ** aToken.decimals()).div(liquidity);
+                uint256 emissionsInWant = _AAVEtoWant(_emissionsPerSecond); // amount of emissions in want
 
-                uint256 incentivesShare = emissionsInWant.mul(poolShare).div(10 ** aToken.decimals());
+                uint256 incentivesRate = emissionsInWant.mul(SECONDS_IN_YEAR).mul(1e18).div(totalLiquidity); // APRs are in 1e18 
 
-                uint256 incentivesRate = incentivesShare.mul(SECONDS_IN_YEAR).mul(1e18).div(liquidity); // should be in 1e18
-
-                return incentivesRate.mul(9_500).div(10_000);
+                return incentivesRate.mul(9_500).div(10_000); // 95% of estimated APR to avoid overestimations
             }
         }
         return 0;
+    }
+
+    // for the management to activate / deactivate incentives functionality
+    function setIsIncentivised(bool _isIncentivised) external management {
+        isIncentivised = _isIncentivised;
+    }
+
+    function _incentivesController() internal view returns (IAaveIncentivesController) {
+        if(isIncentivised) {
+            return aToken.getIncentivesController();
+        } else {
+            return IAaveIncentivesController(0);
+        }
     }
 
     function protectedTokens() internal view override returns (address[] memory) {
