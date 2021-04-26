@@ -15,9 +15,9 @@ import "../Interfaces/Aave/IReserveInterestRateStrategy.sol";
 import "../Libraries/Aave/DataTypes.sol";
 
 /********************
- *   A lender plugin for LenderYieldOptimiser for any erc20 asset on Aave (not eth)
- *   Made by SamPriestley.com
- *   https://github.com/Grandthrax/yearnv2/blob/master/contracts/GenericLender/GenericCream.sol
+ *   A lender plugin for LenderYieldOptimiser for any erc20 asset on Aave
+ *   Made by SamPriestley.com & jmonteer
+ *   https://github.com/Grandthrax/yearnV2-generic-lender-strat/blob/master/contracts/GenericLender/GenericAave.sol
  *
  ********************* */
 
@@ -131,7 +131,16 @@ contract GenericAave is GenericLenderBase {
 
     function deposit() external override management {
         uint256 balance = want.balanceOf(address(this));
-        _lendingPool().deposit(address(want), balance, address(this), 7);
+        ILendingPool lp = _lendingPool();
+        // NOTE: check if allowance is enough and acts accordingly
+        // allowance might not be enough if 
+        //     i) initial allowance has been used (should take years)
+        //     ii) lendingPool contract address has changed (Aave updated the contract address)
+        if(want.allowance(address(this), address(lp)) < balance){
+            IERC20(address(want)).safeApprove(address(lp), type(uint256).max);
+        }
+
+        lp.deposit(address(want), balance, address(this), 7);
     }
 
     function withdrawAll() external override management returns (bool) {

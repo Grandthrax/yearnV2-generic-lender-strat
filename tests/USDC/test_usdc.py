@@ -31,7 +31,7 @@ def test_good_migration(
     strategy.harvest({"from": strategist})
 
     strategy_debt = vault.strategies(strategy)[6]  # totalDebt
-    print(vault.strategies(strategy))
+    print(vault.strategies(strategy).dict())
     prior_position = strategy.estimatedTotalAssets()
     assert strategy_debt > 0
 
@@ -43,7 +43,8 @@ def test_good_migration(
     with brownie.reverts():
         vault.migrateStrategy(strategy, new_strategy, {"from": rando})
 
-    vault.migrateStrategy(strategy, new_strategy, {"from": gov})
+    tx = vault.migrateStrategy(strategy, new_strategy, {"from": gov})
+    print(tx.events)
     assert vault.strategies(strategy)[6] == 0
     assert vault.strategies(new_strategy)[6] == strategy_debt
     assert (
@@ -95,7 +96,7 @@ def test_normal_activity(
     )  # losing some dust is ok
 
     assert strategy.harvestTrigger(1) == False
-    assert 1 == 2
+
     # whale deposits as well
     whale_deposit = 100_000 * (10 ** (decimals))
     vault.deposit(whale_deposit, {"from": whale})
