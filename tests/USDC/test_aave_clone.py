@@ -4,7 +4,6 @@ from useful_methods import genericStateOfVault, genericStateOfStrat
 import random
 import brownie
 
-
 def test_aave_clone(
     chain,
     usdc,
@@ -18,7 +17,6 @@ def test_aave_clone(
     GenericAave,
     aUsdc,
 ):
-
     # Clone magic
     tx = strategy.clone(vault)
     cloned_strategy = Strategy.at(tx.return_value)
@@ -34,12 +32,16 @@ def test_aave_clone(
     # Clone the aave lender
     original_aave = GenericAave.at(strategy.lenders(strategy.numLenders() - 1))
     tx = original_aave.cloneAaveLender(
-        cloned_strategy, "ClonedAaveUSDC", aUsdc, {"from": gov}
+        cloned_strategy, "ClonedAaveUSDC", aUsdc, False, {"from": gov}
     )
     cloned_lender = GenericAave.at(tx.return_value)
     assert cloned_lender.lenderName() == "ClonedAaveUSDC"
 
     cloned_strategy.addLender(cloned_lender, {"from": gov})
+    
+    with brownie.reverts():
+        cloned_lender.initialize['address,bool'](aUsdc, False, {'from': gov})
+
     starting_balance = usdc.balanceOf(strategist)
     currency = usdc
     decimals = currency.decimals()
