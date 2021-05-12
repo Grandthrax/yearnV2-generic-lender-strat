@@ -35,34 +35,66 @@ def test_030_live_dai(
     strategist = samdev
     #dydxPlugin = strategist.deploy(GenericDyDx, strategy, "DyDx")
     #creamPlugin = strategist.deploy(GenericCream, strategy, "Cream", crDai)
-    dydxPlugin = live_dydxdai
-    creamPlugin = live_creamdai
+    
 
 
     vault = live_vault_dai_030
     #tx = live_strat_weth_032.clone(vault, {'from': strategist})
     #strategy = Strategy.at(tx.events['Cloned']["clone"])
-    strategy = live_strat_dai_030
+    strategy = Strategy.at("0x32b8C26d0439e1959CEa6262CBabC12320b384c4")
+
+    dydxPlugin = "0xed2F20ACbb4809BB2F62da75cbE3A0Df557d955E"
+    creamPlugin = "0xC53a7A7bEB51141b750b2752cD1276150a511daa"
+    new_plugin = '0x71be8726c96873f04d2690aa05b2acca7c7104d0'
+    #dai.approve(crDai, 2 ** 256 - 1, {"from": whale})
+    #crDai.mint(10, {'from': whale})
+    #crDai.transfer(creamPlugin, 10, {'from': whale})
+    #strategy.addLender(new_plugin, {'from': daddy})
+
+
+
+    
+    #strategy.harvest({"from": strategist})
+
+
 
     form = "{:.2%}"
     formS = "{:,.0f}"
 
-    manualAll = [[dydxPlugin, 0], [creamPlugin, 1000]]
-    strategy.manualAllocation(manualAll, {"from": strategist})
+    dydxPlugin = "0xed2F20ACbb4809BB2F62da75cbE3A0Df557d955E"
+    creamPlugin = "0xC53a7A7bEB51141b750b2752cD1276150a511daa"
+    
     #print("new alloc")
 
     status = strategy.lendStatuses()
 
     for j in status:
         print(
-            f"Lender: {j[0]}, Deposits: {formS.format(j[1]/1e18)}, APR: {form.format(j[2]/1e18)}"
+            f"Lender: {j[0]} - Deposits: {formS.format(j[1]/1e18)} APR: {form.format(j[2]/1e18)}"
         )
 
     #strategy.setDebtThreshold(1_000_000 *1e18, {'from': strategist})
     #strategy.setProfitFactor(1000, {'from': strategist})
 
-    genericStateOfStrat(strategy, currency, vault)
-    genericStateOfVault(vault, currency)
+    #genericStateOfStrat(strategy, currency, vault)
+    #genericStateOfVault(vault, currency)
+    #manualAll = [[dydxPlugin, 500], [new_plugin, 500]]
+    #manualAll = [[dydxPlugin, 100], [creamPlugin, 900]]
+    manualAll = [[dydxPlugin, 500], [new_plugin, 500]]
+    strategy.manualAllocation(manualAll, {"from": strategist})
+    #strategy.safeRemoveLender(creamPlugin, {"from": strategist})
+    #print("safe_removed")
+    #strategy.harvest({"from": strategist})
+
+
+
+    #strategy.harvest({"from": strategist})
+    status = strategy.lendStatuses()
+
+    for j in status:
+        print(
+            f"Lender: {j[0]}, Deposits: {formS.format(j[1]/1e18)}, APR: {form.format(j[2]/1e18)}"
+        )
 
 
     vault = Contract('0x19D3364A399d251E894aC732651be8B0E4e85001')
