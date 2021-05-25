@@ -16,7 +16,7 @@ compiler:
   solc:
     version: 0.6.12
     remappings:
-      - "@yearnvaults=iearn-finance/yearn-vaults@0.3.4"
+      - "@yearnvaults=iearn-finance/yearn-vaults@0.3.5"
       - "@openzeppelin=OpenZeppelin/openzeppelin-contracts@3.1.0"
 
 reports:

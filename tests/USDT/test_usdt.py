@@ -28,8 +28,9 @@ def test_normal_activity(
     starting_balance = currency.balanceOf(strategist)
 
     decimals = currency.decimals()
+    #print(vault.withdrawalQueue(1))
 
-    strat2 = Contract(vault.withdrawalQueue(1))
+    #strat2 = Contract(vault.withdrawalQueue(1))
 
     currency.approve(vault, 2 ** 256 - 1, {"from": whale})
     currency.approve(vault, 2 ** 256 - 1, {"from": strategist})
@@ -62,13 +63,13 @@ def test_normal_activity(
     assert strategy.harvestTrigger(1000) == True
 
     strategy.harvest({"from": strategist})
-    strat2.harvest({"from": gov})
+    #strat2.harvest({"from": gov})
     status = strategy.lendStatuses()
     form = "{:.2%}"
     formS = "{:,.0f}"
     for j in status:
         print(
-            f"Lender: {j[0]}, Deposits: {formS.format(j[1]/1e6)}, APR: {form.format(j[2]/1e18)}"
+            f"Lender: {j[0]}, Deposits: {formS.format(j[1]/1e6)} APR: {form.format(j[2]/1e18)}"
         )
 
     for i in range(5):
@@ -79,7 +80,7 @@ def test_normal_activity(
         chain.mine(waitBlock)
 
         strategy.harvest({"from": strategist})
-        strat2.harvest({"from": gov})
+        #strat2.harvest({"from": gov})
         chain.sleep(6 * 3600 + 1)  # to avoid sandwich protection
         chain.mine(1)
 
@@ -149,6 +150,126 @@ def test_normal_activity(
     profit = balanceAfter - starting_balance
     assert profit > 0
     print(profit)
+
+
+def test_cream_up_down(
+    usdt,
+    Strategy,
+    crUsdt,
+    samdev,
+    GenericCream,
+    cUsdt,
+    live_strat_weth_1,
+    chain,
+    whale,
+    daddy,
+    currency,
+    strategist,
+    rando,
+    vault,
+    Contract,
+    accounts,
+    fn_isolation,
+    aUsdt,
+):
+
+    gov = accounts.at(vault.governance(), force=True)
+    tx = live_strat_weth_1.clone(vault, {"from": strategist})
+    strategy = Strategy.at(tx.return_value)
+    
+    strategy.setRewards(strategist, {"from": strategist})
+    strategy.setWithdrawalThreshold(0, {"from": strategist})
+
+    creamPlugin = strategist.deploy(GenericCream, strategy, "Cream", crUsdt)
+
+    strategy.addLender(creamPlugin, {"from": gov})
+
+    strategy.setDebtThreshold(1*1e6, {"from": gov})
+    strategy.setProfitFactor(1500, {"from": gov})
+    strategy.setMaxReportDelay(86000, {"from": gov})
+
+    starting_balance = currency.balanceOf(strategist)
+
+    decimals = currency.decimals()
+    #print(vault.withdrawalQueue(1))
+
+    #strat2 = Contract(vault.withdrawalQueue(1))
+
+    currency.approve(vault, 2 ** 256 - 1, {"from": whale})
+    currency.approve(vault, 2 ** 256 - 1, {"from": strategist})
+
+    deposit_limit = 1_000_000_000 * (10 ** (decimals))
+    debt_ratio = 10_000
+    
+    vault.addStrategy(strategy, debt_ratio, 0, 2 ** 256 - 1, 500, {"from": gov})
+    vault.setDepositLimit(deposit_limit, {"from": gov})
+
+    assert deposit_limit == vault.depositLimit()
+    # our humble strategist deposits some test funds
+    depositAmount = 501 * (10 ** (decimals))
+    vault.deposit(depositAmount, {"from": strategist})
+
+    assert strategy.estimatedTotalAssets() == 0
+    chain.mine(1)
+
+    strategy.harvest({"from": strategist})
+
+    #assert (
+    #    strategy.estimatedTotalAssets() >= depositAmount * 0.999999
+    #)  # losing some dust is ok
+    # whale deposits as well
+    whale_deposit = 1_000_000 * (10 ** (decimals))
+    vault.deposit(whale_deposit, {"from": whale})
+    assert strategy.harvestTrigger(1000) == True
+
+    strategy.harvest({"from": strategist})
+    #strat2.harvest({"from": gov})
+    status = strategy.lendStatuses()
+    form = "{:.2%}"
+    formS = "{:,.0f}"
+    for j in status:
+        print(
+            f"Lender: {j[0]}, Deposits: {formS.format(j[1]/1e6)}, APR: {form.format(j[2]/1e18)}"
+        )
+    chain.mine(20)
+    crUsdt.mint(0, {"from": strategist})
+
+
+    vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
+    strategy.harvest({"from": strategist})
+    print(crUsdt.balanceOf(creamPlugin))
+    print(creamPlugin.hasAssets())
+    chain.mine(20)
+    crUsdt.mint(0, {"from": strategist})
+    chain.mine(10)
+    strategy.harvest({"from": strategist})
+    
+    print(crUsdt.balanceOf(creamPlugin))
+    print(creamPlugin.hasAssets())
+    chain.mine(20)
+    crUsdt.mint(0, {"from": strategist})
+
+    chain.mine(10)
+    strategy.harvest({"from": strategist})
+    print(creamPlugin.hasAssets())
+    print(crUsdt.balanceOf(creamPlugin))
+    status = strategy.lendStatuses()
+    for j in status:
+        print(
+            f"Lender: {j[0]}, Deposits: {formS.format(j[1]/1e6)}, APR: {form.format(j[2]/1e18)}"
+        )
+    chain.mine(20)
+    crUsdt.mint(0, {"from": strategist})
+    vault.updateStrategyDebtRatio(strategy, 10_000, {"from": gov})
+    strategy.harvest({"from": strategist})
+
+    strategy.harvest({"from": strategist})
+    status = strategy.lendStatuses()
+    for j in status:
+        print(
+            f"Lender: {j[0]}, Deposits: {formS.format(j[1]/1e6)}, APR: {form.format(j[2]/1e18)}"
+        )
+
 
 
 def test_apr_live_usdt(

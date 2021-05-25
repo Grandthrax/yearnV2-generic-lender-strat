@@ -24,6 +24,7 @@ contract GenericCream is GenericLenderBase {
     using SafeMath for uint256;
 
     uint256 private constant blocksPerYear = 2_300_000;
+    uint256 public dustThreshold = 10_000;
     CErc20I public cToken;
 
     constructor(
@@ -64,11 +65,19 @@ contract GenericCream is GenericLenderBase {
 
     function underlyingBalanceStored() public view returns (uint256 balance) {
         uint256 currentCr = cToken.balanceOf(address(this));
-        if (currentCr == 0) {
+        if (currentCr < dustThreshold) {
             balance = 0;
         } else {
             //The current exchange rate as an unsigned integer, scaled by 1e18.
             balance = currentCr.mul(cToken.exchangeRateStored()).div(1e18);
+        }
+    }
+
+    function convertFromUnderlying(uint256 amountOfUnderlying) public view returns (uint256 balance){
+        if (amountOfUnderlying == 0) {
+            balance = 0;
+        } else {
+            balance = amountOfUnderlying.mul(1e18).div(cToken.exchangeRateStored());
         }
     }
 
@@ -103,10 +112,16 @@ contract GenericCream is GenericLenderBase {
         uint256 looseBalance = want.balanceOf(address(this));
         uint256 total = balanceUnderlying.add(looseBalance);
 
-        if (amount > total) {
-            //cant withdraw more than we own
-            amount = total;
+        if (amount.add(dustThreshold) > total) {
+            //cant withdraw more than we own. so withdraw all we can
+            if(balanceUnderlying > dustThreshold){
+                require(cToken.redeem(cToken.balanceOf(address(this))) == 0, "ctoken: redeemAll fail");
+            }
+            looseBalance = want.balanceOf(address(this));
+            want.safeTransfer(address(strategy), looseBalance);
+            return looseBalance;
         }
+
         if (looseBalance >= amount) {
             want.safeTransfer(address(strategy), amount);
             return amount;
@@ -118,13 +133,12 @@ contract GenericCream is GenericLenderBase {
         if (liquidity > 1) {
             uint256 toWithdraw = amount.sub(looseBalance);
 
-            if (toWithdraw <= liquidity) {
-                //we can take all
-                require(cToken.redeemUnderlying(toWithdraw) == 0, "ctoken: redeemUnderlying fail");
-            } else {
-                //take all we can
-                require(cToken.redeemUnderlying(liquidity) == 0, "ctoken: redeemUnderlying fail");
+            //we can take all
+            if (toWithdraw > liquidity) {
+                toWithdraw = liquidity;
             }
+            require(cToken.redeemUnderlying(toWithdraw) == 0, "ctoken: redeemUnderlying fail");
+            
         }
         looseBalance = want.balanceOf(address(this));
         want.safeTransfer(address(strategy), looseBalance);
@@ -136,14 +150,33 @@ contract GenericCream is GenericLenderBase {
         require(cToken.mint(balance) == 0, "ctoken: mint fail");
     }
 
-    function withdrawAll() external override management returns (bool) {
-        uint256 invested = _nav();
-        uint256 returned = _withdraw(invested);
-        return returned >= invested;
+    //we use different method to withdraw for safety
+    function withdrawAll() external override management returns (bool all) {
+        uint256 liquidity = want.balanceOf(address(cToken));
+        uint256 liquidityInCTokens = convertFromUnderlying(liquidity);
+        uint256 amountInCtokens = cToken.balanceOf(address(this));
+
+        if (liquidityInCTokens > 2) {
+            liquidityInCTokens = liquidityInCTokens-1;
+           
+            if (amountInCtokens <= liquidityInCTokens) {
+                //we can take all
+                all = true;
+                cToken.redeem(amountInCtokens);
+            } else {
+                //redo or else price changes
+                cToken.mint(0);
+                liquidityInCTokens = convertFromUnderlying(want.balanceOf(address(cToken)));
+                //take all we can
+                all = false;
+                cToken.redeem(liquidityInCTokens);
+            }
+        }
+        return all;
     }
 
     function hasAssets() external view override returns (bool) {
-        return cToken.balanceOf(address(this)) > 0;
+        return cToken.balanceOf(address(this)) > dustThreshold;
     }
 
     function aprAfterDeposit(uint256 amount) external view override returns (uint256) {

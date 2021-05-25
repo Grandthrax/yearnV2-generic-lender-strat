@@ -63,7 +63,7 @@ def whale(accounts, web3, weth):
     # big binance7 wallet
     #acc = accounts.at('0xBE0eB53F46cd790Cd13851d5EFf43D12404d33E8', force=True)
     # big binance8 wallet
-    acc = accounts.at("0xf977814e90da44bfa03b6295a0616a897441acec", force=True)
+    acc = accounts.at("0xA929022c9107643515F5c777cE9a910F0D1e490C", force=True)
 
     # lots of weth account
     wethAcc = accounts.at("0x767Ecb395def19Ab8d1b2FCc89B3DDfBeD28fD6b", force=True)
