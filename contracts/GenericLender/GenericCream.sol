@@ -44,6 +44,7 @@ contract GenericCream is GenericLenderBase {
         cToken = CErc20I(_cToken);
         require(cToken.underlying() == address(want), "WRONG CTOKEN");
         want.safeApprove(_cToken, uint256(-1));
+        dustThreshold = 10_000;
     }
 
     function cloneCreamLender(
@@ -123,7 +124,7 @@ contract GenericCream is GenericLenderBase {
         uint256 looseBalance = want.balanceOf(address(this));
         uint256 total = balanceUnderlying.add(looseBalance);
 
-        if (amount.add(dustThreshold) > total) {
+        if (amount.add(dustThreshold) >= total) {
             //cant withdraw more than we own. so withdraw all we can
             if(balanceUnderlying > dustThreshold){
                 require(cToken.redeem(cToken.balanceOf(address(this))) == 0, "ctoken: redeemAll fail");
