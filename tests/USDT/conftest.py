@@ -22,7 +22,7 @@ def live_vault_usdc(pm):
 @pytest.fixture
 def live_vault_usdt(pm):
     Vault = pm(config["dependencies"][0]).Vault
-    vault = Vault.at('0x32651dD149a6EC22734882F790cBEB21402663F9')
+    vault = Vault.at('0x7Da96a3891Add058AdA2E826306D812C638D87a7')
     yield vault
 
 
@@ -53,7 +53,6 @@ def live_GenericDyDx_usdc_1(GenericDyDx):
 def currency(dai, usdt, weth):
     yield usdt
 
-
 @pytest.fixture(autouse=True)
 def isolation(fn_isolation):
     pass
@@ -78,7 +77,8 @@ def whale(accounts, web3, weth):
 @pytest.fixture()
 def strategist(accounts, whale, currency):
     decimals = currency.decimals()
-    currency.transfer(accounts[1], 100_000 * (10 ** decimals), {"from": whale})
+    usdt_whale = "0x47ac0fb4f2d84898e4d9e7b4dab3c24507a6d503"
+    currency.transfer(accounts[1], 100_000 * (10 ** decimals), {"from": usdt_whale})
     yield accounts[1]
 
 
@@ -139,10 +139,6 @@ def dai(interface):
 def weth(interface):
     yield interface.IWETH("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2")
 
-
-
-
-
 @pytest.fixture
 def cUsdt(interface):
     yield interface.CErc20I("0xf650C3d88D12dB855b8bf7D11Be6C55A4e07dCC9")
@@ -155,7 +151,7 @@ def crUsdt(interface):
 
 @pytest.fixture
 def aUsdt(interface):
-    yield interface.CErc20I("0x3Ed3B47Dd13EC9a98b44e6204A523E766B225811")
+    yield interface.IAToken("0x3Ed3B47Dd13EC9a98b44e6204A523E766B225811")
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -165,12 +161,12 @@ def shared_setup(module_isolation):
 
 @pytest.fixture
 def vault(gov, rewards, guardian, currency, pm, live_vault_usdt, stratms, daddy):
-    #Vault = pm(config["dependencies"][0]).Vault
-    #vault = Vault.deploy({"from": guardian})
-    #vault.initialize(currency, gov, rewards, "", "")
-    #vault.setManagementFee(0, {"from": gov})
+    Vault = pm(config["dependencies"][0]).Vault
+    vault = Vault.deploy({"from": guardian})
+    vault.initialize(currency, gov, rewards, "", "")
+    vault.setManagementFee(0, {"from": gov})
     #yield vault
-    vault = live_vault_usdt
+    #vault = live_vault_usdt
     #vault.setGovernance(daddy, {'from': stratms})
     #vault.acceptGovernance({'from': daddy})
 
@@ -200,22 +196,20 @@ def strategy(
 ):
     gov = accounts.at(vault.governance(), force=True)
     tx = live_strat_weth_1.clone(vault, {"from": strategist})
-    #strategy = Strategy.at(tx.return_value)
-    strategy = live_strat_usdt_1
+    strategy = Strategy.at(tx.return_value)
+    #strategy = live_strat_usdt_1
     strategist = accounts.at(strategy.strategist(), force=True)
     strategy.setRewards(strategist, {"from": strategist})
-
-    
-    strategy.setWithdrawalThreshold(0, {"from": gov})
+    strategy.setWithdrawalThreshold(0, {"from": strategist})
 
     compoundPlugin = strategist.deploy(GenericCompound, strategy, "Compound", cUsdt)
 
     #tx = live_GenericCream_aave_1.cloneCreamLender(strategy,"Cream", crUsdt, {"from": strategist})
     #creamPlugin = GenericCream.at(tx.return_value)
-    creamPlugin = live_GenericCream_usdt_1
-    #creamPlugin = strategist.deploy(GenericCream, strategy, "Cream", crUsdt)
+    #creamPlugin = live_GenericCream_usdt_1
+    creamPlugin = strategist.deploy(GenericCream, strategy, "Cream", crUsdt)
 
-    aavePlugin = strategist.deploy(GenericAave, strategy, "Aave", aUsdt)
+    aavePlugin = strategist.deploy(GenericAave, strategy, "Aave", aUsdt, True)
 
     strategy.addLender(creamPlugin, {"from": gov})
     assert strategy.numLenders() == 1

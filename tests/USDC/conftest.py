@@ -1,5 +1,5 @@
 import pytest
-from brownie import Wei, config
+from brownie import Wei, config, Contract
 
 
 @pytest.fixture
@@ -32,7 +32,6 @@ def live_GenericCream_usdc_1(GenericCream):
 @pytest.fixture
 def live_GenericDyDx_usdc_1(GenericDyDx):
     yield GenericDyDx.at("0x6C842746F21Ca34542EDC6895dFfc8D4e7D2bC1c")
-
 
 # change these fixtures for generic tests
 @pytest.fixture
@@ -133,7 +132,7 @@ def crUsdc(interface):
 
 @pytest.fixture
 def aUsdc(interface):
-    yield interface.CErc20I("0xBcca60bB61934080951369a648Fb03DF4F96263C")
+    yield interface.IAToken("0xBcca60bB61934080951369a648Fb03DF4F96263C")
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -165,6 +164,7 @@ def strategy(
     GenericCream,
     GenericDyDx,
     GenericAave,
+    chain
 ):
     strategy = strategist.deploy(Strategy, vault)
     strategy.setKeeper(keeper, {"from": gov})
@@ -174,7 +174,7 @@ def strategy(
     compoundPlugin = strategist.deploy(GenericCompound, strategy, "Compound", cUsdc)
     creamPlugin = strategist.deploy(GenericCream, strategy, "Cream", crUsdc)
     dydxPlugin = strategist.deploy(GenericDyDx, strategy, "DyDx")
-    aavePlugin = strategist.deploy(GenericAave, strategy, "Aave", aUsdc)
+    aavePlugin = strategist.deploy(GenericAave, strategy, "Aave", aUsdc, False)
 
     strategy.addLender(creamPlugin, {"from": gov})
     assert strategy.numLenders() == 1
