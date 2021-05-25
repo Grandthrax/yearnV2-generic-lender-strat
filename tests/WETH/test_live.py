@@ -99,7 +99,7 @@ def xtest_live(
         )
 
 
-def xtest_live2(
+def test_live2(
     currency,
     interface,
     samdev,
@@ -113,34 +113,33 @@ def xtest_live2(
     gov,
     rando,
     fn_isolation,
+    accounts
 ):
     gov = ychad
     decimals = currency.decimals()
     strategist = samdev
     strategy = live_strat_weth_2
     vault = live_vault_weth_2
-    addresses = [whale]
-    permissions = [True]
+    ms = accounts.at("0x16388463d60ffe0661cf7f1f31a7d658ac790ff7", force=True)
+    #genericStateOfStrat(strategy, currency, vault)
+    #genericStateOfVault(vault, currency)
 
-    print(strategy)
-    print(vault)
-    guestList = Contract("0xcB16133a37Ef19F90C570B426292BDcca185BF47")
-    vault.setDepositLimit(500 * 1e18, {"from": gov})
-    vault.setGuestList(guestList, {"from": gov})
-    print("guest list, ", vault.guestList())
-    vault.addStrategy(strategy, 500 * 1e18, 0, 2 ** 256 - 1, 1000, {"from": gov})
+    vault.updateStrategyDebtRatio(strategy, 0, {"from": ms})
+    strategy.harvest({"from": ms})
+    
 
     genericStateOfStrat(strategy, currency, vault)
     genericStateOfVault(vault, currency)
 
-    currency.approve(vault, 2 ** 256 - 1, {"from": whale})
-    currency.approve(vault, 2 ** 256 - 1, {"from": rando})
+    #currency.approve(vault, 2 ** 256 - 1, {"from": whale})
+    #currency.approve(vault, 2 ** 256 - 1, {"from": rando})
 
-    whale_deposit = 100 * (10 ** (decimals))
-    currency.transfer(rando, whale_deposit, {"from": whale})
-    vault.deposit(whale_deposit, {"from": whale})
+    #whale_deposit = 100 * (10 ** (decimals))
+    #currency.transfer(rando, whale_deposit, {"from": whale})
+    #vault.deposit(whale_deposit, {"from": whale})
 
-    strategy.harvest({"from": strategist})
+    
+    
 
     form = "{:.2%}"
     formS = "{:,.0f}"
