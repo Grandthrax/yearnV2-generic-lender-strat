@@ -60,7 +60,13 @@ contract GenericCream is GenericLenderBase {
     }
 
     function _nav() internal view returns (uint256) {
-        return want.balanceOf(address(this)).add(underlyingBalanceStored());
+        uint256 amount = want.balanceOf(address(this)).add(underlyingBalanceStored());
+        if(amount < dustThreshold){
+            return 0;
+        }else{
+            return amount;
+        }
+        
     }
 
     function underlyingBalanceStored() public view returns (uint256 balance) {
@@ -101,9 +107,14 @@ contract GenericCream is GenericLenderBase {
     //emergency withdraw. sends balance plus amount to governance
     function emergencyWithdraw(uint256 amount) external override management {
         //dont care about error here
-        cToken.redeemUnderlying(amount);
+        cToken.redeem(amount);
 
         want.safeTransfer(vault.governance(), want.balanceOf(address(this)));
+    }
+
+    //adjust dust threshol
+    function setDustThreshold(uint256 amount) external management {
+        dustThreshold = amount;
     }
 
     //withdraw an amount including any want balance
