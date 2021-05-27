@@ -31,7 +31,8 @@ def test_cream_up_down(
     vault.updateStrategyDebtRatio(strategy, 25,{"from": gov})
     reduce_strat.harvest({"from": gov})
 
-    creamPlugin = strategist.deploy(GenericCream, strategy, "Ironbank", crWbtc)
+    #creamPlugin = strategist.deploy(GenericCream, strategy, "Ironbank", crWbtc)
+    creamPlugin = GenericCream.at('0x5D3386b5f893774bd2d6c5A1EdE2a88F46639FA3')
     strategy.addLender(creamPlugin, {"from": gov})
 
     
