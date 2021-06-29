@@ -33,13 +33,13 @@ contract Strategy is BaseStrategy {
     using Address for address;
     using SafeMath for uint256;
 
-    address public constant uniswapRouter = address(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
-    address public constant weth = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+    address public constant uniswapRouter = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
+    address public constant weth = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     uint256 public withdrawalThreshold = 1e16;
     uint256 public constant SECONDSPERYEAR = 31556952;
 
     IGenericLender[] public lenders;
-    bool public externalOracle = false;
+    bool public externalOracle; // default is false
     address public wantToEthOracle;
 
     event Cloned(address indexed clone);
@@ -534,18 +534,12 @@ contract Strategy is BaseStrategy {
         }
     }
 
-    function harvestTrigger(uint256 callCost) public view override returns (bool) {
-        uint256 wantCallCost = _callCostToWant(callCost);
-        return super.harvestTrigger(wantCallCost);
-    }
-
-    function ethToWant(uint256 _amount) internal view returns (uint256) {
+    function ethToWant(uint256 _amount) public override view returns (uint256) {
         address[] memory path = new address[](2);
         path[0] = weth;
         path[1] = address(want);
 
         uint256[] memory amounts = IUni(uniswapRouter).getAmountsOut(_amount, path);
-
         return amounts[amounts.length - 1];
     }
 
@@ -593,6 +587,11 @@ contract Strategy is BaseStrategy {
 
             return (wantCallCost.mul(profitFactor) < profitIncrease);
         }
+    }
+
+    function liquidateAllPositions() internal override returns (uint256 _amountFreed) {
+        uint256 outstanding = vault.strategies(address(this)).totalDebt;
+        (,, _amountFreed) = prepareReturn(outstanding);
     }
 
     /*
