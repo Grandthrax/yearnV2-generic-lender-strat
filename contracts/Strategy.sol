@@ -590,8 +590,7 @@ contract Strategy is BaseStrategy {
     }
 
     function liquidateAllPositions() internal override returns (uint256 _amountFreed) {
-        uint256 outstanding = vault.strategies(address(this)).totalDebt;
-        (,, _amountFreed) = prepareReturn(outstanding);
+        _amountFreed = _withdrawSome(lentTotalAssets());
     }
 
     /*
